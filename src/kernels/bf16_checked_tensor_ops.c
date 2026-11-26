@@ -102,6 +102,18 @@ int ck_swiglu_bf16_checked(const uint16_t *gate, const uint16_t *up,
     return gated_bf16(gate, up, out, stage, elements, silu_bf16_storage);
 }
 
+static void sigmoid_bf16_storage(float *values, size_t count)
+{
+    for (size_t i = 0; i < count; ++i)
+        values[i] = bf16_to_float(float_to_bf16(1.0f / (1.0f + expf(-values[i]))));
+}
+
+int ck_sigmoid_mul_bf16_checked(const uint16_t *gate, const uint16_t *up,
+                               uint16_t *out, float *stage, size_t elements)
+{
+    return gated_bf16(gate, up, out, stage, elements, sigmoid_bf16_storage);
+}
+
 int ck_rope_split_positions_bf16_checked(
     const uint16_t *input, const int32_t *positions, const float *inv_freq,
     uint16_t *out, uint16_t *stage, size_t tokens, size_t heads, size_t dim,
@@ -149,6 +161,58 @@ int ck_rope_split_positions_bf16_checked(
                 stage[i + half] = float_to_bf16(yc + xs);
                 if (!isfinite(bf16_to_float(stage[i])) || !isfinite(bf16_to_float(stage[i + half])))
                     return -3;
+            }
+        }
+    }
+    memcpy(out, stage, bytes);
+    return 0;
+}
+
+int ck_rope_interleaved_partial_bf16_checked(const uint16_t *input, const int32_t *positions,
+                                            const float *inv_freq, uint16_t *out, uint16_t *stage,
+                                            size_t tokens, size_t heads, size_t dim,
+                                            size_t elements, size_t frequencies)
+{
+    if (!tokens || !heads || !dim || !frequencies || frequencies > dim / 2 ||
+        tokens > SIZE_MAX / heads || tokens * heads > SIZE_MAX / dim ||
+        elements != tokens * heads * dim)
+        return -2;
+    if (!valid_span(input, elements, 2) || !valid_span(out, elements, 2) ||
+        !valid_span(stage, elements, 2) || !valid_span(positions, tokens, 4) ||
+        !valid_span(inv_freq, frequencies, 4))
+        return -2;
+    const size_t bytes = elements * 2;
+    if (overlaps(out, bytes, stage, bytes))
+        return -2;
+    const void *operands[] = {input, positions, inv_freq};
+    const size_t sizes[] = {bytes, tokens * 4, frequencies * 4};
+    for (size_t i = 0; i < 3; ++i)
+        if (overlaps(out, bytes, operands[i], sizes[i]) ||
+            overlaps(stage, bytes, operands[i], sizes[i]))
+            return -2;
+
+    for (size_t i = 0; i < elements; ++i)
+        if (!isfinite(bf16_to_float(input[i])))
+            return -3;
+    memcpy(stage, input, bytes);
+    for (size_t token = 0; token < tokens; ++token) {
+        if (positions[token] < 0)
+            return -2;
+        for (size_t pair = 0; pair < frequencies; ++pair) {
+            const float angle = (float)positions[token] * inv_freq[pair];
+            if (!isfinite(angle) || inv_freq[pair] < 0.0f)
+                return -3;
+            const float cosine = cosf(angle), sine = sinf(angle);
+            for (size_t head = 0; head < heads; ++head) {
+                const size_t i = (token * heads + head) * dim + pair * 2;
+                const float x = bf16_to_float(input[i]), y = bf16_to_float(input[i + 1]);
+                const volatile float xc = x * cosine, ys = y * sine;
+                const volatile float yc = y * cosine, xs = x * sine;
+                const uint16_t even = float_to_bf16(xc - ys), odd = float_to_bf16(yc + xs);
+                if (!isfinite(bf16_to_float(even)) || !isfinite(bf16_to_float(odd)))
+                    return -3;
+                stage[i] = even;
+                stage[i + 1] = odd;
             }
         }
     }

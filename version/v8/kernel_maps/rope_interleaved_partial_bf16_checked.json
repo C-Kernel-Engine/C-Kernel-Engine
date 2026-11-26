@@ -1,0 +1,243 @@
+{
+  "id": "rope_interleaved_partial_bf16_checked",
+  "op": "rope_interleaved_partial_bf16_checked",
+  "operation_interface": "tensor.rope_interleaved_partial_bf16_checked.v1",
+  "variant": "partial_interleaved_fp32_math_bf16_output",
+  "quant": {
+    "weight": "fp32",
+    "activation": "bf16",
+    "output": "bf16"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "bf16",
+      "shape": [
+        "T",
+        "H",
+        "D"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "positions",
+      "dtype": "i32",
+      "shape": [
+        "T"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [
+    {
+      "name": "inv_freq",
+      "dtype": "fp32",
+      "shape": [
+        "F"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "bf16",
+      "shape": [
+        "T",
+        "H",
+        "D"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "output",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "stage",
+      "dtype": "bf16",
+      "shape": [
+        "T",
+        "H",
+        "D"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read_write",
+      "consumption": "required",
+      "size_bytes": "2 * T * H * D",
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64
+    }
+  ],
+  "dims": [
+    "T",
+    "H",
+    "D",
+    "F"
+  ],
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "impl": {
+    "function": "ck_rope_interleaved_partial_bf16_checked",
+    "c_declaration": "int ck_rope_interleaved_partial_bf16_checked(const uint16_t *input, const int32_t *positions, const float *inv_freq, uint16_t *out, uint16_t *stage, size_t tokens, size_t heads, size_t dim, size_t elements, size_t frequencies);",
+    "sources": [
+      "src/kernels/bf16_checked_tensor_ops.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const uint16_t*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "positions",
+        "source": "activation:positions",
+        "cast": "const int32_t*",
+        "ports": [
+          "input:positions"
+        ]
+      },
+      {
+        "name": "inv_freq",
+        "source": "weight:inv_freq",
+        "cast": "const float*",
+        "ports": [
+          "weight:inv_freq"
+        ]
+      },
+      {
+        "name": "out",
+        "source": "output:out",
+        "cast": "uint16_t*",
+        "ports": [
+          "output:out"
+        ]
+      },
+      {
+        "name": "stage",
+        "source": "scratch:stage",
+        "cast": "uint16_t*"
+      },
+      {
+        "name": "tokens",
+        "source": "runtime:tokens",
+        "value_type": "size_t"
+      },
+      {
+        "name": "heads",
+        "source": "runtime:heads",
+        "value_type": "size_t"
+      },
+      {
+        "name": "dim",
+        "source": "runtime:dim",
+        "value_type": "size_t"
+      },
+      {
+        "name": "elements",
+        "source": "runtime:elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "frequencies",
+        "source": "runtime:frequencies",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "T": "tokens",
+      "H": "heads",
+      "D": "dim",
+      "F": "frequencies"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2,
+        "storage_dtype": "bf16",
+        "exact_elements_product": [
+          "tokens",
+          "heads",
+          "dim"
+        ]
+      },
+      {
+        "pointer": "positions",
+        "elements": "tokens",
+        "rows": 1,
+        "width": "tokens",
+        "element_bytes": 4,
+        "storage_dtype": "i32"
+      },
+      {
+        "pointer": "inv_freq",
+        "elements": "frequencies",
+        "rows": 1,
+        "width": "frequencies",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      },
+      {
+        "pointer": "out",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2,
+        "storage_dtype": "bf16",
+        "exact_elements_product": [
+          "tokens",
+          "heads",
+          "dim"
+        ]
+      },
+      {
+        "pointer": "stage",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2,
+        "exact_elements_product": [
+          "tokens",
+          "heads",
+          "dim"
+        ]
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_drama3_bf16_tower.py"
+    ]
+  },
+  "notes": "Rotate adjacent pairs in the first 2 * frequencies channels. Use FP32 trigonometry, products and adds, then round once to BF16. Copy remaining channels verbatim."
+}
