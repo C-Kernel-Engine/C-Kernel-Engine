@@ -56,8 +56,8 @@ int ck_scale_bf16_checked(const uint16_t *input, const uint16_t *weight,
     return binary_bf16(input, weight, 1, out, stage, elements, 1);
 }
 
-int ck_geglu_tanh_bf16_checked(const uint16_t *gate, const uint16_t *up,
-                             uint16_t *out, float *stage, size_t n)
+static int gated_bf16(const uint16_t *gate, const uint16_t *up, uint16_t *out,
+                      float *stage, size_t n, void (*activate)(float *, size_t))
 {
     if (!n || !valid_span(gate, n, 2) || !valid_span(up, n, 2) ||
         !valid_span(out, n, 2) || !valid_span(stage, n, 4))
@@ -71,7 +71,7 @@ int ck_geglu_tanh_bf16_checked(const uint16_t *gate, const uint16_t *up,
         if (!isfinite(stage[i]) || !isfinite(bf16_to_float(up[i])))
             return -3;
     }
-    gelu_pytorch_tanh_bf16_storage(stage, n);
+    activate(stage, n);
     for (size_t i = 0; i < n; ++i) {
         stage[i] *= bf16_to_float(up[i]);
         if (!isfinite(bf16_to_float(float_to_bf16(stage[i]))))
@@ -80,6 +80,26 @@ int ck_geglu_tanh_bf16_checked(const uint16_t *gate, const uint16_t *up,
     for (size_t i = 0; i < n; ++i)
         out[i] = float_to_bf16(stage[i]);
     return 0;
+}
+
+int ck_geglu_tanh_bf16_checked(const uint16_t *gate, const uint16_t *up,
+                             uint16_t *out, float *stage, size_t elements)
+{
+    return gated_bf16(gate, up, out, stage, elements, gelu_pytorch_tanh_bf16_storage);
+}
+
+static void silu_bf16_storage(float *values, size_t count)
+{
+    for (size_t i = 0; i < count; ++i) {
+        const float x = values[i];
+        values[i] = bf16_to_float(float_to_bf16(x / (1.0f + expf(-x))));
+    }
+}
+
+int ck_swiglu_bf16_checked(const uint16_t *gate, const uint16_t *up,
+                          uint16_t *out, float *stage, size_t elements)
+{
+    return gated_bf16(gate, up, out, stage, elements, silu_bf16_storage);
 }
 
 int ck_rope_split_positions_bf16_checked(

@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 583,
+      "total": 586,
       "by_op": {
         "add_backward": 1,
         "add_bf16_checked": 1,
@@ -22,7 +22,7 @@
         "attention_full_token_major_checked": 1,
         "attention_last_query_prob_trace": 1,
         "attention_projection": 1,
-        "attention_ranges_checked": 2,
+        "attention_ranges_checked": 3,
         "attention_sliding": 15,
         "attention_sliding_bounded": 1,
         "attn_gate_sigmoid_mul": 2,
@@ -85,6 +85,7 @@
         "channel_scale_rows_checked": 1,
         "clip_strided_checked": 1,
         "concat_feature_rows_checked": 1,
+        "concat_features_bf16_checked": 1,
         "concat_i32_checked": 1,
         "copy_i32_span_checked": 1,
         "copy_last_logits": 1,
@@ -271,6 +272,7 @@
         "ssm_conv1d": 4,
         "ssm_conv1d_backward": 1,
         "swiglu": 5,
+        "swiglu_bf16_checked": 1,
         "tanh_strided_checked": 1,
         "token_head_layout_checked": 2,
         "token_span_mean_backward_checked": 2,
@@ -16103,6 +16105,345 @@
       "notes": "Checked BF16 query, key, value, and output. Round dot products, scaled scores, normalization probabilities, and final values to BF16 RNE. Dot products, the softmax denominator, and value sums accumulate in FP64 ascending key or feature order. Scratch is memory_tokens + query_tokens * heads * head_dim FP32 elements.",
       "name": "attention_ranges_checked_bf16",
       "_source_file": "attention_ranges_checked_bf16.json"
+    },
+    {
+      "id": "attention_ranges_checked_bf16_math",
+      "op": "attention_ranges_checked",
+      "operation_interface": "attention.two_ranges.token_major.gqa.bf16_math.checked.v1",
+      "variant": "scalar_fp64_reduction_bf16_output_only",
+      "selection": {
+        "status": "candidate",
+        "priority": 100,
+        "equivalence_group": "attention.two_ranges.token_major.gqa.bf16_math.checked.v1",
+        "phases": [
+          "prefill"
+        ]
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "bf16",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "query",
+          "dtype": "bf16",
+          "shape": [
+            "Q",
+            "H*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "key",
+          "dtype": "bf16",
+          "shape": [
+            "S",
+            "G*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "value",
+          "dtype": "bf16",
+          "shape": [
+            "S",
+            "G*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ranges",
+          "dtype": "i32",
+          "shape": [
+            "Q",
+            4
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "bf16",
+          "shape": [
+            "Q",
+            "H*D"
+          ],
+          "layout": "token_major_contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "scratch",
+          "dtype": "fp32",
+          "shape": [
+            "X"
+          ],
+          "size_bytes": "4 * X",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64,
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "Q",
+        "S",
+        "H",
+        "G",
+        "D",
+        "X"
+      ],
+      "constraints": {
+        "notes": "Batch one. Each query selects up to two ordered nonoverlapping half-open key ranges. Q heads must be a multiple of KV heads. Visible keys reduce in ascending order. Output unchanged on rejection."
+      },
+      "impl": {
+        "function": "ck_attention_ranges_checked_bf16_math",
+        "c_declaration": "int ck_attention_ranges_checked_bf16_math(const uint16_t *query, size_t query_elements, const uint16_t *key, size_t key_elements, const uint16_t *value, size_t value_elements, const int32_t *ranges, size_t range_elements, uint16_t *output, size_t output_elements, float *scratch, size_t scratch_elements, size_t query_tokens, size_t memory_tokens, size_t heads, size_t kv_heads, size_t head_dim, float scale);",
+        "sources": [
+          "src/kernels/attention_ranges_checked.c"
+        ]
+      },
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "numerical_capabilities": [
+        {
+          "contract_id": "attention_ranges_scalar_fp64_reduction_bf16_output_only",
+          "status": "validated",
+          "phases": [
+            "prefill"
+          ],
+          "function": "ck_attention_ranges_checked_bf16_math",
+          "explicit_selector": true,
+          "implementation": {
+            "isa_dispatch": "scalar",
+            "threading": {
+              "runtime": "serial",
+              "work_partition": [
+                "serial"
+              ],
+              "dispatch": [
+                "inline"
+              ],
+              "reduction_order_effect": "none"
+            }
+          },
+          "arithmetic": {
+            "partial_accumulator": "fp64",
+            "merge_order": "none",
+            "deterministic": true,
+            "thread_count_changes_arithmetic_order": false,
+            "split_strategy": "serial"
+          }
+        }
+      ],
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "query",
+            "source": "activation:query",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:query"
+            ]
+          },
+          {
+            "name": "query_elements",
+            "source": "runtime:query_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "key",
+            "source": "activation:key",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:key"
+            ]
+          },
+          {
+            "name": "key_elements",
+            "source": "runtime:key_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "value",
+            "source": "activation:value",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:value"
+            ]
+          },
+          {
+            "name": "value_elements",
+            "source": "runtime:value_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "ranges",
+            "source": "activation:ranges",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:ranges"
+            ]
+          },
+          {
+            "name": "range_elements",
+            "source": "runtime:range_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scratch",
+            "source": "scratch:scratch",
+            "cast": "float*"
+          },
+          {
+            "name": "scratch_elements",
+            "source": "runtime:scratch_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "query_tokens",
+            "source": "runtime:query_tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "memory_tokens",
+            "source": "runtime:memory_tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "heads",
+            "source": "runtime:heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "kv_heads",
+            "source": "runtime:kv_heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "head_dim",
+            "source": "runtime:head_dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scale",
+            "source": "param:scale"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "Q": "query_tokens",
+          "S": "memory_tokens",
+          "H": "heads",
+          "D": "head_dim",
+          "X": "scratch_elements",
+          "G": "kv_heads"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "query",
+            "elements": "query_elements",
+            "rows": "query_elements",
+            "width": 1,
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "key",
+            "elements": "key_elements",
+            "rows": "key_elements",
+            "width": 1,
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "value",
+            "elements": "value_elements",
+            "rows": "value_elements",
+            "width": 1,
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "output_elements",
+            "width": 1,
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "scratch",
+            "elements": "scratch_elements",
+            "rows": 1,
+            "width": "scratch_elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          },
+          {
+            "pointer": "ranges",
+            "elements": "range_elements",
+            "rows": "query_tokens",
+            "width": 4,
+            "element_bytes": 4,
+            "storage_dtype": "i32"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_sigma_bf16_block.py"
+        ],
+        "oracle": "PyTorch BF16 scaled_dot_product_attention with forced math backend and explicit allowed key ranges."
+      },
+      "notes": "BF16 operands with FP64 ordered dot products, softmax denominator and value sums. Scaled logits and exponentials use FP32 storage; only the final output is rounded to BF16.",
+      "name": "attention_ranges_checked_bf16_math",
+      "_source_file": "attention_ranges_checked_bf16_math.json"
     },
     {
       "id": "attention_ranges_checked_f32",
@@ -36873,6 +37214,185 @@
       },
       "name": "concat_feature_rows_checked_f32",
       "_source_file": "concat_feature_rows_checked_f32.json"
+    },
+    {
+      "id": "concat_features_bf16_checked",
+      "op": "concat_features_bf16_checked",
+      "operation_interface": "tensor.concat_features_bf16_checked.v1",
+      "variant": "contiguous_storage_copy",
+      "quant": {
+        "weight": "none",
+        "activation": "bf16",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "left",
+          "dtype": "bf16",
+          "shape": [
+            "R",
+            "A"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "right",
+          "dtype": "bf16",
+          "shape": [
+            "R",
+            "B"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "bf16",
+          "shape": [
+            "R",
+            "C"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "output",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "A",
+        "B",
+        "C"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_concat_features_bf16_checked",
+        "c_declaration": "int ck_concat_features_bf16_checked(const uint16_t *left, const uint16_t *right, uint16_t *out, size_t rows, size_t left_width, size_t right_width, size_t left_elements, size_t right_elements, size_t out_elements, size_t out_width);",
+        "sources": [
+          "src/kernels/concat_features_bf16_checked.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "left",
+            "source": "activation:left",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:left"
+            ]
+          },
+          {
+            "name": "right",
+            "source": "activation:right",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:right"
+            ]
+          },
+          {
+            "name": "out",
+            "source": "output:out",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "left_width",
+            "source": "runtime:left_width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "right_width",
+            "source": "runtime:right_width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "left_elements",
+            "source": "runtime:left_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "right_elements",
+            "source": "runtime:right_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "out_elements",
+            "source": "runtime:out_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "out_width",
+            "source": "runtime:out_width",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "A": "left_width",
+          "B": "right_width",
+          "C": "out_width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "left",
+            "elements": "left_elements",
+            "rows": "rows",
+            "width": "left_width",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "right",
+            "elements": "right_elements",
+            "rows": "rows",
+            "width": "right_width",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "out",
+            "elements": "out_elements",
+            "rows": "rows",
+            "width": "out_width",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_sigma_bf16_block.py"
+        ]
+      },
+      "notes": "Tensor storage copy along the trailing dimension. Output must be disjoint from both inputs; validation precedes copying.",
+      "name": "concat_features_bf16_checked",
+      "_source_file": "concat_features_bf16_checked.json"
     },
     {
       "id": "concat_i32_checked",
@@ -120486,6 +121006,176 @@
       "notes": "Exact SwiGLU backward kernel for v7 training IR.",
       "name": "swiglu_backward_exact",
       "_source_file": "swiglu_backward_exact.json"
+    },
+    {
+      "id": "swiglu_bf16_checked",
+      "op": "swiglu_bf16_checked",
+      "operation_interface": "tensor.swiglu_bf16_checked.v1",
+      "variant": "ordered_bf16_storage",
+      "quant": {
+        "weight": "none",
+        "activation": "bf16",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "gate",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "output",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "stage",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "consumption": "required",
+          "size_bytes": "4 * N",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64
+        }
+      ],
+      "dims": [
+        "N"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_swiglu_bf16_checked",
+        "c_declaration": "int ck_swiglu_bf16_checked(const uint16_t *gate, const uint16_t *up, uint16_t *out, float *stage, size_t elements);",
+        "sources": [
+          "src/kernels/bf16_checked_tensor_ops.c",
+          "src/kernels/gelu_kernels.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "gate",
+            "source": "activation:gate",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:gate"
+            ]
+          },
+          {
+            "name": "up",
+            "source": "activation:up",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:up"
+            ]
+          },
+          {
+            "name": "out",
+            "source": "output:out",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "stage",
+            "source": "scratch:stage",
+            "cast": "float*"
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "gate",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "up",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "out",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "stage",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_sigma_bf16_block.py"
+        ]
+      },
+      "notes": "Round the FP32 SiLU gate to BF16 before multiplying by the up projection, then round the product to BF16.",
+      "name": "swiglu_bf16_checked",
+      "_source_file": "swiglu_bf16_checked.json"
     },
     {
       "id": "swiglu_forward",

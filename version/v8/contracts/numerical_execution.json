@@ -5342,6 +5342,17 @@
       "position_transform": null,
       "description": "Token-major checked grouped-query attention with BF16 rounding after the dot, after scaling, after normalization, and after the value dot. FP64 ascending reductions are deterministic. Staged output remains untouched on rejection."
     },
+    "attention_ranges_scalar_fp64_reduction_bf16_output_only": {
+      "operator_family": "attention",
+      "status": "validated",
+      "storage": {"input": "bf16", "weight": "none", "output": "bf16"},
+      "compute": {"input": "bf16", "weight": "none", "accumulator": "fp64", "contraction": "disabled", "evaluation_order": "ascending_query_head_visible_key_and_channel"},
+      "rounding": {"mode": "rne", "points": ["activation_intermediate_store", "output_store"]},
+      "reduction": {"kind": "sum", "order": "ascending_index", "partial_accumulator": "fp64", "merge_order": "none"},
+      "threading": {"work_partition": "serial", "split_strategy": "serial", "deterministic": true, "thread_count_changes_arithmetic_order": false},
+      "position_transform": null,
+      "description": "Token-major checked grouped-query attention with FP32 scaled-logit and exponential stores, and BF16 output rounding only. FP64 ascending reductions are deterministic. Staged output remains untouched on rejection."
+    },
     "equal_i32_scalar_exact": {
       "operator_family": "equal_i32_scalar_checked",
       "status": "validated",
