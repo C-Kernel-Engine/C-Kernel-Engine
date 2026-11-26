@@ -204,6 +204,14 @@ Equal-logit cutoff ties can select different experts in the publisher's
 PyTorch implementation. Compare selected IDs together with weights and inspect
 ties before attributing a residual mismatch to expert arithmetic.
 
+For Groundhog's BF16 score comparison, add `--bf16-cblas --partition-topk`
+to the replay command. This profile selects compact FP32-accumulating BF16
+CBLAS for row projections and score-only partition routing for cutoff ties.
+The LP64 library must export `cblas_gemm_bf16bf16f32`. Both dense and
+expert projections use the selected compact BF16 CBLAS provider. The pinned acceptance gate uses the
+same 0.5 maximum error, 0.25 RMSE and matching winners as Bison. The default
+FP64 profile remains available for numerical diagnosis.
+
 ### Sigma BF16 denoiser block replay
 
 The generated entry uses explicit positions and key ranges for a nonempty

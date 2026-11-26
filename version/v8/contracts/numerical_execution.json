@@ -4849,6 +4849,47 @@
       "position_transform": null,
       "description": "Observed llama.cpp-compatible AVX2 full-softmax top-k MoE routing order. Distinct-score Qwen3.5 production shapes are bit-exact; equal-score cross-toolchain ordering remains uncertified."
     },
+    "partition_full_softmax_topk_selected_renorm_fp32_avx2": {
+      "operator_family": "moe_router",
+      "status": "observed",
+      "storage": {
+        "input": "fp32",
+        "weight": "none",
+        "output": "fp32"
+      },
+      "compute": {
+        "input": "fp32",
+        "weight": "none",
+        "accumulator": "fp64",
+        "contraction": "enabled",
+        "evaluation_order": "full_vector_max_then_avx2_fma_exponential_chunks_then_fp64_chunk_sum_then_fp32_probability_scale_then_topk_then_fp64_selected_sum_cast_fp32_clamp_divide_and_scale"
+      },
+      "rounding": {
+        "mode": "rne",
+        "points": [
+          "vector_exponential",
+          "reduction_update",
+          "softmax_probability_store",
+          "reduction_finalize",
+          "output_divide",
+          "output_store"
+        ]
+      },
+      "reduction": {
+        "kind": "composite",
+        "order": "stage_ordered",
+        "partial_accumulator": "fp64",
+        "merge_order": "selected_slot_order"
+      },
+      "threading": {
+        "work_partition": "independent_rows",
+        "split_strategy": "independent_outputs",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false
+      },
+      "position_transform": null,
+      "description": "AVX2 full softmax followed by score-only median-of-three partition top-k for K > E / 64. Ordered retained-probability sum and FP32 renormalization. When the partition budget is exhausted, sort the remaining interval deterministically."
+    },
     "pytorch_full_softmax_topk_selected_renorm_bf16_storage": {
       "operator_family": "moe_router",
       "status": "validated",

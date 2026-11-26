@@ -11,6 +11,8 @@ int ck_linear_rows_bf16_checked(const uint16_t *, size_t, const uint16_t *, size
 int ck_linear_rows_bf16_blas_checked(const uint16_t *, size_t, const uint16_t *, size_t,
                                      uint16_t *, size_t, uint16_t *, size_t, double *, size_t,
                                      size_t, size_t, size_t);
+int ck_linear_rows_bf16_cblas_checked(const uint16_t *, size_t, const uint16_t *, size_t,
+                                      uint16_t *, size_t, float *, size_t, size_t, size_t, size_t);
 int ck_geglu_tanh_bf16_checked(const uint16_t *, const uint16_t *, uint16_t *, float *, size_t);
 
 typedef struct {
@@ -18,13 +20,17 @@ typedef struct {
     size_t blas_elements;
     uint16_t *stage;
     size_t stage_elements;
-    int use_blas;
+    int projection_mode;
 } projection_workspace;
 
 static int project(const uint16_t *input, const uint16_t *weight, uint16_t *out,
                    size_t rows, size_t in_width, size_t out_width, projection_workspace work)
 {
-    if (work.use_blas)
+    if (work.projection_mode == 2)
+        return ck_linear_rows_bf16_cblas_checked(
+            input, rows * in_width, weight, in_width * out_width, out,
+            rows * out_width, (float *)work.blas, work.blas_elements, rows, in_width, out_width);
+    if (work.projection_mode == 1)
         return ck_linear_rows_bf16_blas_checked(
             input, rows * in_width, weight, in_width * out_width, out,
             rows * out_width, work.stage, work.stage_elements, work.blas,
@@ -44,11 +50,11 @@ static int overlaps(const void *a, size_t a_bytes, const void *b, size_t b_bytes
     return (uintptr_t)a < (uintptr_t)b + b_bytes && (uintptr_t)b < (uintptr_t)a + a_bytes;
 }
 
-int ck_routed_geglu_bf16_checked(
+static int routed_geglu_bf16_checked(
     const uint16_t *input, const int32_t *ids, const float *scores,
     const uint16_t *gate_up, const uint16_t *down, uint16_t *out, uint16_t *routes,
     void *workspace, size_t workspace_bytes, size_t rows, size_t width,
-    size_t inner, size_t experts, size_t top_k, int use_blas,
+    size_t inner, size_t experts, size_t top_k, int projection_mode,
     size_t hidden_elements, size_t selected_elements, size_t route_elements,
     size_t gate_elements, size_t down_elements)
 {
@@ -61,9 +67,11 @@ int ck_routed_geglu_bf16_checked(
         return -2;
     const size_t rh = rows * width, ri = rows * inner;
     const size_t rk = rows * top_k, routed = rk * width;
-    const size_t hi = width * inner, blas_elements = rh + 2 * hi + 2 * ri;
-    const size_t work_bytes = 8 * blas_elements + 4 * inner + 2 * (4 * rh + 5 * ri + routed);
-    if (workspace_bytes < work_bytes || (use_blas != 0 && use_blas != 1) ||
+    const size_t hi = width * inner;
+    const size_t blas_elements = rh + 2 * ri + (projection_mode == 2 ? 0 : 2 * hi);
+    const size_t blas_bytes = blas_elements * (projection_mode == 2 ? sizeof(float) : sizeof(double));
+    const size_t work_bytes = blas_bytes + 4 * inner + 2 * (4 * rh + 5 * ri + routed);
+    if (workspace_bytes < work_bytes ||
         hidden_elements != rh || selected_elements != rk || route_elements != routed ||
         gate_elements != experts * 2 * hi || down_elements != experts * hi)
         return -2;
@@ -95,7 +103,7 @@ int ck_routed_geglu_bf16_checked(
     }
 
     double *blas = workspace;
-    float *gelu = (float *)(blas + blas_elements);
+    float *gelu = (float *)((uint8_t *)workspace + blas_bytes);
     uint16_t *gathered = (uint16_t *)(gelu + inner);
     uint16_t *gate = gathered + rh;
     uint16_t *active = gate + 2 * ri;
@@ -104,7 +112,7 @@ int ck_routed_geglu_bf16_checked(
     uint16_t *accum = stage + rh + 2 * ri;
     uint16_t *route_stage = accum + rh;
     memset(accum, 0, rh * sizeof(*accum));
-    const projection_workspace projection = {blas, blas_elements, stage, rh + 2 * ri, use_blas};
+    const projection_workspace projection = {blas, blas_elements, stage, rh + 2 * ri, projection_mode};
 
     // Match expert-major index_add order. The route slot is used only to
     // associate the input row and scaled probability with this expert.
@@ -149,4 +157,33 @@ int ck_routed_geglu_bf16_checked(
     memcpy(out, accum, rh * 2);
     memcpy(routes, route_stage, routed * 2);
     return 0;
+}
+
+
+int ck_routed_geglu_bf16_checked(
+    const uint16_t *input, const int32_t *ids, const float *scores,
+    const uint16_t *gate_up, const uint16_t *down, uint16_t *out, uint16_t *routes,
+    void *workspace, size_t workspace_bytes, size_t rows, size_t width,
+    size_t inner, size_t experts, size_t top_k, int use_blas,
+    size_t hidden_elements, size_t selected_elements, size_t route_elements,
+    size_t gate_elements, size_t down_elements)
+{
+    if (use_blas != 0 && use_blas != 1)
+        return -2;
+    return routed_geglu_bf16_checked(input, ids, scores, gate_up, down, out, routes,
+        workspace, workspace_bytes, rows, width, inner, experts, top_k, use_blas,
+        hidden_elements, selected_elements, route_elements, gate_elements, down_elements);
+}
+
+int ck_routed_geglu_bf16_cblas_checked(
+    const uint16_t *input, const int32_t *ids, const float *scores,
+    const uint16_t *gate_up, const uint16_t *down, uint16_t *out, uint16_t *routes,
+    void *workspace, size_t workspace_bytes, size_t rows, size_t width,
+    size_t inner, size_t experts, size_t top_k,
+    size_t hidden_elements, size_t selected_elements, size_t route_elements,
+    size_t gate_elements, size_t down_elements)
+{
+    return routed_geglu_bf16_checked(input, ids, scores, gate_up, down, out, routes,
+        workspace, workspace_bytes, rows, width, inner, experts, top_k, 2,
+        hidden_elements, selected_elements, route_elements, gate_elements, down_elements);
 }
