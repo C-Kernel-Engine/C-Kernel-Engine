@@ -19,11 +19,14 @@ static int overlap(const void *a, size_t a_bytes, const void *b, size_t b_bytes)
            (uintptr_t)b < (uintptr_t)a + a_bytes;
 }
 
-/* Adapt compact BF16 buffers to the established two-round weighted RMSNorm. */
-int ck_rmsnorm_rows_bf16_checked(
+typedef void (*rmsnorm_forward_fn)(const float *, const float *, float *, float *,
+                                  int, int, int, float);
+
+static int rmsnorm_rows_bf16_checked(
     const uint16_t *input, size_t input_elements, const uint16_t *gamma,
     size_t gamma_elements, uint16_t *output, size_t output_elements,
-    float *work, size_t work_elements, size_t rows, size_t width, float epsilon)
+    float *work, size_t work_elements, size_t rows, size_t width, float epsilon,
+    rmsnorm_forward_fn normalize)
 {
     if (!rows || !width || rows > INT_MAX || width > INT_MAX ||
         rows > (SIZE_MAX - width) / width || !isfinite(epsilon) || epsilon <= 0.0f) {
@@ -64,7 +67,7 @@ int ck_rmsnorm_rows_bf16_checked(
             return -3;
         }
     }
-    rmsnorm_forward_pytorch_bf16_storage(
+    normalize(
         work, expanded_gamma, work, NULL, (int)rows, (int)width, (int)width, epsilon);
     for (size_t i = 0; i < count; ++i) {
         if (!isfinite(work[i])) {
@@ -75,4 +78,24 @@ int ck_rmsnorm_rows_bf16_checked(
         output[i] = float_to_bf16(work[i]);
     }
     return 0;
+}
+
+int ck_rmsnorm_rows_bf16_checked(
+    const uint16_t *input, size_t input_elements, const uint16_t *gamma,
+    size_t gamma_elements, uint16_t *output, size_t output_elements,
+    float *work, size_t work_elements, size_t rows, size_t width, float epsilon)
+{
+    return rmsnorm_rows_bf16_checked(input, input_elements, gamma, gamma_elements,
+        output, output_elements, work, work_elements, rows, width, epsilon,
+        rmsnorm_forward_pytorch_bf16_storage);
+}
+
+int ck_rmsnorm_rows_weighted_single_round_bf16_checked(
+    const uint16_t *input, size_t input_elements, const uint16_t *gamma,
+    size_t gamma_elements, uint16_t *output, size_t output_elements,
+    float *work, size_t work_elements, size_t rows, size_t width, float epsilon)
+{
+    return rmsnorm_rows_bf16_checked(input, input_elements, gamma, gamma_elements,
+        output, output_elements, work, work_elements, rows, width, epsilon,
+        rmsnorm_forward_muse_weighted_pytorch_bf16_storage);
 }
