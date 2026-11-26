@@ -12,7 +12,7 @@ from build_kokoro_source_residual_first_pair_oracle_circuit import (
     build_circuit as first_pair_oracle_circuit)
 
 
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_source_residual_block0_oracle_input_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_source_residual_block0_oracle_input_bounded.json'
 
 
 def build_circuit():
@@ -45,7 +45,8 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('source residual block oracle-input circuit differs')
     else:
-        args.output.write_text(content)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(content, encoding='utf-8')
 
 
 if __name__ == '__main__':

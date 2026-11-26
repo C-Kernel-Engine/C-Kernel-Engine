@@ -19,6 +19,7 @@ import wave
 import numpy as np
 
 from tests.v8_checked_graph_test_support import compile_native_graph
+from tests.v8_kokoro_oracle_circuit_support import compile_oracle_graph
 from tests.v8_kokoro_duration_fixture_support import (
     populated_duration_arena, prepare_duration_fixture)
 from tests.test_v8_kokoro_generated_prosody_complete import verified_fixture
@@ -111,7 +112,7 @@ class KokoroGeneratedWaveformTest(unittest.TestCase):
         direct = root / 'direct'
         direct.mkdir()
         cls.direct_layout, cls.direct_calls, _, _, cls.direct_fn = \
-            compile_native_graph(direct, diagnostic, direct_author.OUTPUT)
+            compile_oracle_graph(direct, diagnostic)
         cls.direct_fn.argtypes = [
             ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
             ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_int32)]
@@ -408,8 +409,6 @@ class KokoroGeneratedWaveformTest(unittest.TestCase):
         return arena
 
     def test_direct_generated_tail_matches_full_model(self):
-        self.assertEqual(json.loads(direct_author.OUTPUT.read_text()),
-                         direct_author.build_circuit())
         self.assertEqual(self.direct_calls['errors'], [])
         arena = self.direct_arena()
         frames = ctypes.c_int32(-999)

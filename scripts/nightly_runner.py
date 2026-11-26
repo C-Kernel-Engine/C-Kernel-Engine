@@ -1920,6 +1920,11 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_kokoro_source_impact_diagnostic.py",
         timeout_sec=300,
     ),
+    "tts_kokoro_oracle_circuit_inventory": TestSuite(
+        "Kokoro Oracle-Input Circuit Regeneration", "inference",
+        ROOT / "tests" / "test_v8_kokoro_oracle_circuit_inventory.py",
+        unittest_targets=("tests.test_v8_kokoro_oracle_circuit_inventory",),
+    ),
     "tts_kokoro_source_residual_prefix": TestSuite(
         "Kokoro Generated First Source Residual Prefix", "inference",
         ROOT / "tests" / "test_v8_kokoro_source_residual_prefix.py",
