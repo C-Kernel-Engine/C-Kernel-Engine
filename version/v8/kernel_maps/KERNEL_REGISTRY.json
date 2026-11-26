@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 586,
+      "total": 589,
       "by_op": {
         "add_backward": 1,
         "add_bf16_checked": 1,
@@ -220,11 +220,12 @@
         "rms_pair_concat_rows_checked": 1,
         "rmsnorm": 12,
         "rmsnorm_f32_square_f64_sum_rows_checked": 1,
-        "rmsnorm_rows_bf16_checked": 2,
+        "rmsnorm_rows_bf16_checked": 3,
         "rmsnorm_rows_checked": 1,
         "rope": 19,
         "rope_backward": 2,
         "rope_init": 3,
+        "rope_interleaved_partial_bf16_checked": 1,
         "rope_pairwise_rows_checked": 1,
         "rope_qk_bounded": 1,
         "rope_split_positions_bf16_checked": 1,
@@ -255,6 +256,7 @@
         "shared_relu2_expert_mlp": 1,
         "shared_swiglu_expert_mlp": 6,
         "sigmoid_gate_rows_checked": 1,
+        "sigmoid_mul_bf16_checked": 1,
         "sigmoid_topk_router_checked": 1,
         "silu_mul_rows_checked": 1,
         "silu_strided_checked": 1,
@@ -100992,6 +100994,213 @@
       "_source_file": "rmsnorm_rows_bf16_checked.json"
     },
     {
+      "id": "rmsnorm_rows_centered_single_round_bf16_checked",
+      "op": "rmsnorm_rows_bf16_checked",
+      "operation_interface": "rmsnorm.row_major.compact_bf16.centered_single_round.checked.v1",
+      "variant": "zero_centered_single_round_bf16_storage",
+      "quant": {
+        "weight": "bf16",
+        "activation": "bf16",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "bf16",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "gamma",
+          "dtype": "bf16",
+          "shape": [
+            "K"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "bf16",
+          "shape": [
+            "M",
+            "K"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "work",
+          "dtype": "fp32",
+          "shape": [
+            "M*K+K"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "size_bytes": "4 * (M * K + K)",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64
+        }
+      ],
+      "dims": [
+        "M",
+        "K"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_rmsnorm_rows_centered_single_round_bf16_checked",
+        "c_declaration": "int ck_rmsnorm_rows_centered_single_round_bf16_checked(const uint16_t *input, size_t input_elements, const uint16_t *gamma, size_t gamma_elements, uint16_t *output, size_t output_elements, float *work, size_t work_elements, size_t rows, size_t width, float epsilon);",
+        "sources": [
+          "src/kernels/rmsnorm_bf16_checked.c",
+          "src/kernels/rmsnorm_kernels.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gamma",
+            "source": "weight:gamma",
+            "cast": "const uint16_t*",
+            "ports": [
+              "weight:gamma"
+            ]
+          },
+          {
+            "name": "gamma_elements",
+            "source": "runtime:gamma_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "work",
+            "source": "scratch:work",
+            "cast": "float*"
+          },
+          {
+            "name": "work_elements",
+            "source": "runtime:work_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "epsilon",
+            "source": "param:epsilon"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "M": "rows",
+          "K": "width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "gamma",
+            "elements": "gamma_elements",
+            "rows": 1,
+            "width": "width",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "rows",
+            "width": "width",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "work",
+            "elements": "work_elements",
+            "rows": 1,
+            "width": "work_elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_drama3_bf16_tower.py"
+        ],
+        "oracle": "PyTorch FP32 RMSNorm with the zero-centered weight shift, then BF16 storage."
+      },
+      "notes": "Compute FP32 RMSNorm with gain (1 + BF16 gamma widened to FP32) and round once to BF16.",
+      "name": "rmsnorm_rows_centered_single_round_bf16_checked",
+      "_source_file": "rmsnorm_rows_centered_single_round_bf16_checked.json"
+    },
+    {
       "id": "rmsnorm_rows_checked_f32",
       "op": "rmsnorm_rows_checked",
       "operation_interface": "rmsnorm.checked_rows.fp32.v1",
@@ -104061,6 +104270,251 @@
       "notes": "Explicit ggml CPU recursive frequency stepping and FMA ordering; separate from the direct independent-frequency provider. Full-model certification pending.",
       "name": "rope_forward_qk_split_llama",
       "_source_file": "rope_forward_qk_split_llama.json"
+    },
+    {
+      "id": "rope_interleaved_partial_bf16_checked",
+      "op": "rope_interleaved_partial_bf16_checked",
+      "operation_interface": "tensor.rope_interleaved_partial_bf16_checked.v1",
+      "variant": "partial_interleaved_fp32_math_bf16_output",
+      "quant": {
+        "weight": "fp32",
+        "activation": "bf16",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "bf16",
+          "shape": [
+            "T",
+            "H",
+            "D"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "positions",
+          "dtype": "i32",
+          "shape": [
+            "T"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "inv_freq",
+          "dtype": "fp32",
+          "shape": [
+            "F"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "bf16",
+          "shape": [
+            "T",
+            "H",
+            "D"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "output",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "stage",
+          "dtype": "bf16",
+          "shape": [
+            "T",
+            "H",
+            "D"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "consumption": "required",
+          "size_bytes": "2 * T * H * D",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64
+        }
+      ],
+      "dims": [
+        "T",
+        "H",
+        "D",
+        "F"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_rope_interleaved_partial_bf16_checked",
+        "c_declaration": "int ck_rope_interleaved_partial_bf16_checked(const uint16_t *input, const int32_t *positions, const float *inv_freq, uint16_t *out, uint16_t *stage, size_t tokens, size_t heads, size_t dim, size_t elements, size_t frequencies);",
+        "sources": [
+          "src/kernels/bf16_checked_tensor_ops.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "positions",
+            "source": "activation:positions",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:positions"
+            ]
+          },
+          {
+            "name": "inv_freq",
+            "source": "weight:inv_freq",
+            "cast": "const float*",
+            "ports": [
+              "weight:inv_freq"
+            ]
+          },
+          {
+            "name": "out",
+            "source": "output:out",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "stage",
+            "source": "scratch:stage",
+            "cast": "uint16_t*"
+          },
+          {
+            "name": "tokens",
+            "source": "runtime:tokens",
+            "value_type": "size_t"
+          },
+          {
+            "name": "heads",
+            "source": "runtime:heads",
+            "value_type": "size_t"
+          },
+          {
+            "name": "dim",
+            "source": "runtime:dim",
+            "value_type": "size_t"
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "frequencies",
+            "source": "runtime:frequencies",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "T": "tokens",
+          "H": "heads",
+          "D": "dim",
+          "F": "frequencies"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16",
+            "exact_elements_product": [
+              "tokens",
+              "heads",
+              "dim"
+            ]
+          },
+          {
+            "pointer": "positions",
+            "elements": "tokens",
+            "rows": 1,
+            "width": "tokens",
+            "element_bytes": 4,
+            "storage_dtype": "i32"
+          },
+          {
+            "pointer": "inv_freq",
+            "elements": "frequencies",
+            "rows": 1,
+            "width": "frequencies",
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          },
+          {
+            "pointer": "out",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16",
+            "exact_elements_product": [
+              "tokens",
+              "heads",
+              "dim"
+            ]
+          },
+          {
+            "pointer": "stage",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "exact_elements_product": [
+              "tokens",
+              "heads",
+              "dim"
+            ]
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_drama3_bf16_tower.py"
+        ]
+      },
+      "notes": "Rotate adjacent pairs in the first 2 * frequencies channels. Use FP32 trigonometry, products and adds, then round once to BF16. Copy remaining channels verbatim.",
+      "name": "rope_interleaved_partial_bf16_checked",
+      "_source_file": "rope_interleaved_partial_bf16_checked.json"
     },
     {
       "id": "rope_pairwise_rows_f32_checked",
@@ -118018,6 +118472,176 @@
       },
       "name": "sigmoid_gate_rows_checked_f32",
       "_source_file": "sigmoid_gate_rows_checked_f32.json"
+    },
+    {
+      "id": "sigmoid_mul_bf16_checked",
+      "op": "sigmoid_mul_bf16_checked",
+      "operation_interface": "tensor.sigmoid_mul_bf16_checked.v1",
+      "variant": "ordered_bf16_storage",
+      "quant": {
+        "weight": "none",
+        "activation": "bf16",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "gate",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "up",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "output",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "stage",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "consumption": "required",
+          "size_bytes": "4 * N",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64
+        }
+      ],
+      "dims": [
+        "N"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_sigmoid_mul_bf16_checked",
+        "c_declaration": "int ck_sigmoid_mul_bf16_checked(const uint16_t *gate, const uint16_t *up, uint16_t *out, float *stage, size_t elements);",
+        "sources": [
+          "src/kernels/bf16_checked_tensor_ops.c",
+          "src/kernels/gelu_kernels.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "gate",
+            "source": "activation:gate",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:gate"
+            ]
+          },
+          {
+            "name": "up",
+            "source": "activation:up",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:up"
+            ]
+          },
+          {
+            "name": "out",
+            "source": "output:out",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "stage",
+            "source": "scratch:stage",
+            "cast": "float*"
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "gate",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "up",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "out",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "stage",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_drama3_bf16_tower.py"
+        ]
+      },
+      "notes": "Round the sigmoid gate to BF16, multiply by the other operand, then round to BF16.",
+      "name": "sigmoid_mul_bf16_checked",
+      "_source_file": "sigmoid_mul_bf16_checked.json"
     },
     {
       "id": "sigmoid_topk_router_checked_f32",

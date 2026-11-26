@@ -208,3 +208,22 @@ Set `CK_SIGMA_BF16_CHECKPOINT` to the pinned Sigma-3B safetensors and
 the weight-backed comparison. The test verifies tensor hashes, compares
 against PyTorch's math attention backend, and reports each checkpoint when
 invoked with `-o junit_family=xunit1 --junitxml sigma-block.xml`.
+
+### Drama 3 BF16 shared codebook tower replay
+
+The first layer accepts teacher-forced code rows, backbone hidden rows and the
+prepared sum of codebook embeddings unseen by the backbone. The code row
+equal to the vocabulary size addresses a zero row for non-semantic tokens.
+The generated entry runs the embedding gather, zero-centered norm, mixing,
+interleaved partial RoPE, causal gated attention, SwiGLU and final norm.
+Checkpoint preparation splits the packed Q/gate/K/V weights by output row.
+
+For the pinned weight replay, fetch the byte ranges from
+`fishaudio/drama-3` at revision `78e5ab79e49aa9a25abe8799eff2c4d73a1c3216`. Use
+`model-00014-of-00015.safetensors`, bytes `0-1048575` as `shard14.header` and
+`382550624-546149983` as `shared0.bin`. The test verifies both SHA-256 hashes
+before interpreting weights. Set `CK_DRAMA3_TOWER0_RANGE_DIR` to their directory,
+provide an LP64 `CK_BLAS_LIBRARY`, and run
+`python -m pytest -q tests/test_v8_drama3_bf16_tower.py`. Without the checkpoint
+ranges the synthetic composition still runs and the pinned test reports SKIP.
+The replay covers one layer with supplied inputs, before native prediction.

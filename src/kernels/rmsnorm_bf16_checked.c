@@ -99,3 +99,13 @@ int ck_rmsnorm_rows_weighted_single_round_bf16_checked(
         output, output_elements, work, work_elements, rows, width, epsilon,
         rmsnorm_forward_muse_weighted_pytorch_bf16_storage);
 }
+
+int ck_rmsnorm_rows_centered_single_round_bf16_checked(
+    const uint16_t *input, size_t input_elements, const uint16_t *gamma,
+    size_t gamma_elements, uint16_t *output, size_t output_elements,
+    float *work, size_t work_elements, size_t rows, size_t width, float epsilon)
+{
+    return rmsnorm_rows_bf16_checked(input, input_elements, gamma, gamma_elements,
+        output, output_elements, work, work_elements, rows, width, epsilon,
+        rmsnorm_forward_muse_centered_pytorch_bf16_storage);
+}
