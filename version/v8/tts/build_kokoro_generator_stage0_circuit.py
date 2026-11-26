@@ -10,7 +10,7 @@ from build_kokoro_prosody_second_block_circuit import declared
 
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_generator_stage0_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_generator_stage0_bounded.json'
 INPUT_CHANNELS = 512
 OUTPUT_CHANNELS = 256
 INPUT_CAPACITY = 256
@@ -122,6 +122,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('generator stage0 circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

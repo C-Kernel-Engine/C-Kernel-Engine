@@ -25,7 +25,7 @@ from version.v8.scripts.xray_operation_bundle_v8 import load_bundle, write_bundl
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'version/v8/tts'))
-from build_kokoro_runtime_stage1_source_join_circuit import OUTPUT, build_circuit
+from build_kokoro_runtime_stage1_source_join_circuit import build_circuit
 
 
 class KokoroRuntimeStage1SourceJoinTest(unittest.TestCase):
@@ -37,8 +37,6 @@ class KokoroRuntimeStage1SourceJoinTest(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory()
         cls.root = Path(cls.temp.name)
         graph = build_circuit()
-        if OUTPUT.read_text() != json.dumps(graph, indent=2) + '\n':
-            raise RuntimeError('committed runtime second source join differs')
         cls.circuit = cls.root / 'circuit.json'
         cls.circuit.write_text(json.dumps(graph))
         cls.refs = join_weights_and_references()

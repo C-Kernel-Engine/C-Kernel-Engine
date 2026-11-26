@@ -12,7 +12,7 @@ from build_kokoro_source_residual_prefix_circuit import (
     CAPACITY, CHANNELS, PREFIX, ROOT)
 
 
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_source_residual_block0_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_source_residual_block0_bounded.json'
 
 
 def append_pair(graph, pair, input_name):
@@ -107,6 +107,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('source residual block circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

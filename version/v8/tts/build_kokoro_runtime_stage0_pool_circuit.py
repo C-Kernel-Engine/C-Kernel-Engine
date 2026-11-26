@@ -13,7 +13,7 @@ from build_kokoro_runtime_stage0_join_circuit import (
 
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_runtime_stage0_pool_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_runtime_stage0_pool_bounded.json'
 
 
 def build_circuit():
@@ -55,6 +55,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('runtime stage0 pool differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

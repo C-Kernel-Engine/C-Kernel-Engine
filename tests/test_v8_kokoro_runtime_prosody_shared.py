@@ -14,7 +14,7 @@ from tests.v8_kokoro_duration_fixture_support import prepare_duration_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'version/v8/tts'))
-from build_kokoro_runtime_prosody_shared_circuit import build_circuit, OUTPUT
+from build_kokoro_runtime_prosody_shared_circuit import build_circuit
 
 CAPACITY = 64
 FRAMES = CAPACITY * 50
@@ -26,8 +26,6 @@ class KokoroRuntimeProsodySharedTest(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory()
         root = Path(cls.temp.name)
         graph = build_circuit()
-        if OUTPUT.read_text() != json.dumps(graph, indent=2) + '\n':
-            raise RuntimeError('committed circuit differs from authoring')
         cls.circuit = root / 'circuit.json'
         cls.circuit.write_text(json.dumps(graph))
         base = ROOT / 'tests/fixtures/tts'

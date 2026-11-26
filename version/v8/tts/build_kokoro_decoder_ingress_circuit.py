@@ -9,7 +9,7 @@ from build_kokoro_prosody_complete_circuit import build_circuit as prosody_circu
 
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_decoder_ingress_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_decoder_ingress_bounded.json'
 FRAME_CAPACITY = 128
 UPSAMPLED_CAPACITY = 256
 
@@ -153,6 +153,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('decoder ingress circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

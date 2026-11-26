@@ -11,7 +11,7 @@ from build_kokoro_source_residual_block0_circuit import build_circuit as source_
 
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_generator_stage0_join_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_generator_stage0_join_bounded.json'
 CHANNELS = 256
 CAPACITY = 2560
 
@@ -119,6 +119,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('generator stage0 join circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

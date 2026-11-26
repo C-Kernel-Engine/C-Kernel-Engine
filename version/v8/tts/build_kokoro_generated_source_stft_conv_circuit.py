@@ -8,7 +8,7 @@ from pathlib import Path
 from build_kokoro_generated_f0_source_circuit import build_circuit as source_circuit
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_generated_source_stft_conv_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_generated_source_stft_conv_bounded.json'
 F0_CAPACITY = 256
 SAMPLE_CAPACITY = 76800
 STFT_FRAMES_CAPACITY = SAMPLE_CAPACITY // 5 + 1
@@ -148,6 +148,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('generated source STFT/convolution circuit differs')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

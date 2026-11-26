@@ -9,7 +9,7 @@ from build_kokoro_generated_source_stft_conv_circuit import build_circuit as sou
 
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_source_residual_prefix_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_source_residual_prefix_bounded.json'
 CHANNELS = 256
 CAPACITY = 2560
 STYLE = 128
@@ -147,6 +147,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('source residual prefix circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

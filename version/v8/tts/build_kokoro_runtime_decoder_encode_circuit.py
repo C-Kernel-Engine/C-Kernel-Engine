@@ -11,7 +11,7 @@ from build_kokoro_decoder_encode_circuit import (
     add_decoder_block, decoder_residual_block_ops)
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_runtime_decoder_encode_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_runtime_decoder_encode_bounded.json'
 
 
 def build_circuit():
@@ -39,6 +39,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('runtime decoder encode differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

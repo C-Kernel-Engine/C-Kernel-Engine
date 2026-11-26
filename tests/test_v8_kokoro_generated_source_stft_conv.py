@@ -12,6 +12,7 @@ import unittest
 import numpy as np
 
 from tests.v8_checked_graph_test_support import compile_native_graph
+from tests.v8_kokoro_stage_circuit_support import materialize_stage_circuit
 from tests.v8_kokoro_duration_fixture_support import (
     populated_duration_arena, prepare_duration_fixture)
 from tests.test_v8_kokoro_generated_prosody_complete import (
@@ -43,11 +44,12 @@ class KokoroGeneratedSourceStftConvTest(unittest.TestCase):
             ('source_conv_weight', 'waveform_decoder.generator.noise_convs.0.weight'),
             ('source_conv_bias', 'waveform_decoder.generator.noise_convs.0.bias')):
             weights[name] = cls.oracle[key]
-        fixture = prepare_duration_fixture(Path(cls.temp.name), author.OUTPUT, weights)
+        circuit = materialize_stage_circuit(Path(cls.temp.name), author)
+        fixture = prepare_duration_fixture(Path(cls.temp.name), circuit, weights)
         for name, value in vars(fixture).items():
             setattr(cls, name, value)
         cls.layout, cls.calls, cls.library, cls.loaded, cls.fn = \
-            compile_native_graph(Path(cls.temp.name), cls.source, author.OUTPUT)
+            compile_native_graph(Path(cls.temp.name), cls.source, circuit)
         conv_library = Path(cls.temp.name) / 'source_conv_checked.so'
         subprocess.run(['cc', '-std=c11', '-O2', '-shared', '-fPIC',
             '-I', str(ROOT / 'include'),
@@ -346,7 +348,6 @@ class KokoroGeneratedSourceStftConvTest(unittest.TestCase):
             self.assertTrue(np.isfinite(native_conv).all())
 
     def test_generated_source_stft_conv_and_known_raw_phase_failure(self):
-        self.assertEqual(json.loads(author.OUTPUT.read_text()), author.build_circuit())
         self.assertEqual(self.calls['errors'], [])
         self.assertEqual([op['function'] for op in self.calls['operations'][-4:]],
             ['ck_runtime_affine_i32_checked', 'ck_runtime_scale_i32_checked',

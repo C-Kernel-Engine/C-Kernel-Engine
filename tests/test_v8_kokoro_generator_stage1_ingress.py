@@ -12,6 +12,7 @@ import numpy as np
 
 from tests.v8_checked_graph_test_support import compile_native_graph
 from tests.v8_kokoro_oracle_circuit_support import compile_oracle_graph
+from tests.v8_kokoro_stage_circuit_support import materialize_stage_circuit
 from tests.v8_kokoro_duration_fixture_support import (
     populated_duration_arena, prepare_duration_fixture)
 from tests.test_v8_kokoro_generator_stage0_join import join_weights_and_references
@@ -48,14 +49,15 @@ class KokoroGeneratorStage1IngressTest(unittest.TestCase):
         weights = stage0_pool_weights(cls.refs, first, cls.tail)
         weights['waveform_decoder.generator.ups.1.weight'] = cls.stage1['weight']
         weights['waveform_decoder.generator.ups.1.bias'] = cls.stage1['bias']
-        fixture = prepare_duration_fixture(root, connected_author.OUTPUT, weights)
+        circuit = materialize_stage_circuit(root, connected_author)
+        fixture = prepare_duration_fixture(root, circuit, weights)
         cls.encoder, cls.duration = fixture.encoder, fixture.duration
         cls.entries, cls.bump = fixture.entries, fixture.bump
         connected = root / 'connected'
         connected.mkdir()
         (cls.connected_layout, cls.connected_calls, _,
          _, cls.connected_fn) = compile_native_graph(
-            connected, fixture.source, connected_author.OUTPUT)
+            connected, fixture.source, circuit)
         cls.connected_fn.argtypes = [
             ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t] + [
             ctypes.POINTER(ctypes.c_int32)] * 7
@@ -136,8 +138,6 @@ class KokoroGeneratorStage1IngressTest(unittest.TestCase):
         return arena
 
     def test_declarations_and_selected_providers(self):
-        self.assertEqual(json.loads(connected_author.OUTPUT.read_text()),
-                         connected_author.build_circuit())
         self.assertEqual(self.connected_calls['errors'], [])
         self.assertEqual(self.direct_calls['errors'], [])
         self.assertEqual(

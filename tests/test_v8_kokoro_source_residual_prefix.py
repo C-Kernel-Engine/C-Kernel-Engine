@@ -13,6 +13,7 @@ import numpy as np
 
 from tests.v8_checked_graph_test_support import compile_native_graph
 from tests.v8_kokoro_oracle_circuit_support import compile_oracle_graph
+from tests.v8_kokoro_stage_circuit_support import materialize_stage_circuit
 from tests.v8_kokoro_duration_fixture_support import (
     populated_duration_arena, prepare_duration_fixture)
 from tests.test_v8_kokoro_generated_prosody_complete import (
@@ -67,14 +68,15 @@ class KokoroSourceResidualPrefixTest(unittest.TestCase):
                 ('conv_weight', f'{prefix}.convs1.0.weight'),
                 ('conv_bias', f'{prefix}.convs1.0.bias')):
             weights[name] = cls.residual[key]
-        fixture = prepare_duration_fixture(root, connected_author.OUTPUT, weights)
+        circuit = materialize_stage_circuit(root, connected_author)
+        fixture = prepare_duration_fixture(root, circuit, weights)
         for name, value in vars(fixture).items():
             setattr(cls, name, value)
         connected_dir = root / 'connected'
         connected_dir.mkdir()
         (cls.connected_layout, cls.connected_calls, _, cls.connected_loaded,
             cls.connected_fn) = compile_native_graph(
-                connected_dir, fixture.source, connected_author.OUTPUT)
+                connected_dir, fixture.source, circuit)
         cls.connected_fn.argtypes = [ctypes.POINTER(ctypes.c_uint8),
             ctypes.c_size_t] + [ctypes.POINTER(ctypes.c_int32)] * 5
         diagnostic = copy.deepcopy(fixture.source)
@@ -142,8 +144,6 @@ class KokoroSourceResidualPrefixTest(unittest.TestCase):
         return arena
 
     def test_circuit_regeneration_and_selected_providers(self):
-        self.assertEqual(json.loads(connected_author.OUTPUT.read_text()),
-                         connected_author.build_circuit())
         selected = [item['function'] for item in
                     self.connected_calls['operations'][-4:]]
         self.assertEqual(selected, ['linear_rows_checked_f32',

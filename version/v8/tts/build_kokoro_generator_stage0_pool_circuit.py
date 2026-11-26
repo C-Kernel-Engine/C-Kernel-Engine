@@ -11,7 +11,7 @@ from build_kokoro_generator_main_resblock0_circuit import (
 )
 
 
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_generator_stage0_pool_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_generator_stage0_pool_bounded.json'
 
 
 def build_circuit(tokens=36):
@@ -111,6 +111,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('stage0 pool circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

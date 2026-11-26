@@ -13,7 +13,7 @@ from build_kokoro_generator_stage1_join_circuit import (
 from build_kokoro_prosody_second_block_circuit import declared
 
 
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_generator_stage1_pool_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_generator_stage1_pool_bounded.json'
 SOURCE_STEMS = ('main_res_pair', 'main_resblock1_pair',
                 'main_resblock2_pair')
 
@@ -170,6 +170,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('stage-one pool circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

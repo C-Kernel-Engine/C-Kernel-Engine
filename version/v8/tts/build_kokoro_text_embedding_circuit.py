@@ -12,7 +12,7 @@ from pathlib import Path
 from build_kokoro_expansion_circuit import build_circuit as expansion_circuit
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_text_embedding_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_text_embedding_bounded.json'
 
 
 def build_circuit(tokens=36):
@@ -82,6 +82,7 @@ def main():
         if args.output.read_text() != contents:
             raise SystemExit('text embedding circuit differs from authoring source')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(contents)
 
 

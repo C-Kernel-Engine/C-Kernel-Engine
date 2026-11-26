@@ -12,6 +12,7 @@ import numpy as np
 
 from tests.v8_checked_graph_test_support import compile_native_graph
 from tests.v8_kokoro_oracle_circuit_support import compile_oracle_graph
+from tests.v8_kokoro_stage_circuit_support import materialize_stage_circuit
 from tests.v8_kokoro_duration_fixture_support import (
     populated_duration_arena, prepare_duration_fixture)
 from tests.test_v8_kokoro_generator_stage0_join import (
@@ -61,13 +62,14 @@ class KokoroGeneratorStage1PoolTest(unittest.TestCase):
         weights.update({key: value for data in (cls.join, cls.pool)
                         for key, value in data.items()
                         if key.startswith('waveform_decoder.')})
-        fixture = prepare_duration_fixture(root, connected_author.OUTPUT, weights)
+        circuit = materialize_stage_circuit(root, connected_author)
+        fixture = prepare_duration_fixture(root, circuit, weights)
         cls.encoder, cls.duration = fixture.encoder, fixture.duration
         cls.entries, cls.bump = fixture.entries, fixture.bump
         connected = root / 'connected'
         connected.mkdir()
         cls.connected_layout, cls.connected_calls, _, _, cls.connected_fn = \
-            compile_native_graph(connected, fixture.source, connected_author.OUTPUT)
+            compile_native_graph(connected, fixture.source, circuit)
         cls.connected_fn.argtypes = [
             ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t] + [
             ctypes.POINTER(ctypes.c_int32)] * 7
@@ -140,8 +142,6 @@ class KokoroGeneratorStage1PoolTest(unittest.TestCase):
         return arena
 
     def test_circuit_selection_and_direct_full_model_parity(self):
-        self.assertEqual(json.loads(connected_author.OUTPUT.read_text()),
-                         connected_author.build_circuit())
         self.assertEqual(self.connected_calls['errors'], [])
         self.assertEqual(self.direct_calls['errors'], [])
         self.assertEqual(self.direct_calls['operations'][-1]['function'],

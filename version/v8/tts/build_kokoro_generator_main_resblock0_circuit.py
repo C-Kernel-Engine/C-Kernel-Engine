@@ -10,7 +10,7 @@ from build_kokoro_generator_stage0_join_circuit import build_circuit as join_cir
 
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_generator_main_resblock0_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_generator_main_resblock0_bounded.json'
 CHANNELS = 256
 CAPACITY = 2560
 KERNEL = 3
@@ -132,6 +132,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('main generator residual circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

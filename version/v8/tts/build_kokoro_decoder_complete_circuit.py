@@ -15,7 +15,7 @@ from build_kokoro_prosody_second_block_circuit import (
 
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_decoder_complete_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_decoder_complete_bounded.json'
 INPUT_FRAMES = 128
 OUTPUT_FRAMES = 256
 INPUT_CHANNELS = 1090
@@ -150,6 +150,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('complete decoder circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

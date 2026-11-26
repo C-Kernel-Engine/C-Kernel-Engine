@@ -10,7 +10,7 @@ from build_kokoro_prosody_second_block_circuit import (
     convolution, OUTPUT_CAPACITY, OUTPUT_CHANNELS)
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_prosody_complete_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_prosody_complete_bounded.json'
 
 
 def final_branch(branch, output_capacity=OUTPUT_CAPACITY):
@@ -99,6 +99,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('complete prosody circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

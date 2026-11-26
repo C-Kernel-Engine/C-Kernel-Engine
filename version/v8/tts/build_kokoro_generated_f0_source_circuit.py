@@ -9,7 +9,7 @@ from build_kokoro_prosody_complete_circuit import build_circuit as prosody_circu
 
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_generated_f0_source_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_generated_f0_source_bounded.json'
 F0_CAPACITY = 256
 UPSAMPLE = 300
 HARMONICS = 9
@@ -135,6 +135,7 @@ def main():
         if args.output.read_text() != content:
             raise SystemExit('generated F0/source circuit differs from authoring')
     else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(content)
 
 

@@ -10,6 +10,7 @@ import unittest
 import numpy as np
 
 from tests.v8_checked_graph_test_support import compile_native_graph
+from tests.v8_kokoro_stage_circuit_support import materialize_stage_circuit
 from tests.v8_kokoro_duration_fixture_support import (
     populated_duration_arena, prepare_duration_fixture)
 from tests.test_v8_kokoro_generated_prosody_complete import verified_fixture
@@ -69,11 +70,12 @@ class KokoroGeneratedDecoderEncodeTest(unittest.TestCase):
         for name, value in cls.encode.items():
             if name.startswith('waveform_decoder.'):
                 weights[name] = value
-        fixture = prepare_duration_fixture(cls.root, author.OUTPUT, weights)
+        circuit = materialize_stage_circuit(cls.root, author)
+        fixture = prepare_duration_fixture(cls.root, circuit, weights)
         for name, value in vars(fixture).items():
             setattr(cls, name, value)
         cls.layout, cls.calls, cls.library, cls.loaded, cls.fn = \
-            compile_native_graph(cls.root, cls.source, author.OUTPUT)
+            compile_native_graph(cls.root, cls.source, circuit)
         cls.fn.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
                            ctypes.POINTER(ctypes.c_int32),
                            ctypes.POINTER(ctypes.c_int32)]
@@ -102,7 +104,6 @@ class KokoroGeneratedDecoderEncodeTest(unittest.TestCase):
         return arena
 
     def test_direct_model_parity(self):
-        self.assertEqual(json.loads(author.OUTPUT.read_text()), author.build_circuit())
         self.assertEqual(self.calls['errors'], [])
         arena = self.arena()
         frames = ctypes.c_int32(-999)

@@ -11,7 +11,7 @@ from pathlib import Path
 from build_kokoro_text_embedding_circuit import build_circuit as embedding_circuit
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'version/v8/circuits/kokoro_text_encoder_bounded.json'
+OUTPUT = ROOT / 'build/kokoro-diagnostics/kokoro_text_encoder_bounded.json'
 TOKENS = 36
 CHANNELS = 512
 STRIDE = 40
@@ -210,7 +210,9 @@ def main():
     if args.check:
         if args.output.read_text()!=content:
             raise SystemExit('text encoder circuit differs from authoring source')
-    else:args.output.write_text(content)
+    else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(content)
 
 
 if __name__=='__main__':main()
