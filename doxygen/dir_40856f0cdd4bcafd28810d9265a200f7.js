@@ -159,6 +159,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "rope_kernels.c", "rope__kernels_8c.html", "rope__kernels_8c" ],
     [ "rope_kernels_bf16.c", "rope__kernels__bf16_8c.html", "rope__kernels__bf16_8c" ],
     [ "rope_pairwise_rows_checked.c", "rope__pairwise__rows__checked_8c.html", "rope__pairwise__rows__checked_8c" ],
+    [ "routed_geglu_bf16_checked.c", "routed__geglu__bf16__checked_8c.html", "routed__geglu__bf16__checked_8c" ],
     [ "routed_softcapped_experts_checked.c", "routed__softcapped__experts__checked_8c.html", "routed__softcapped__experts__checked_8c" ],
     [ "runtime_extent.c", "runtime__extent_8c.html", "runtime__extent_8c" ],
     [ "rwkv7_decode.c", "rwkv7__decode_8c.html", "rwkv7__decode_8c" ],

@@ -142,6 +142,7 @@ Typedefs</h2></td></tr>
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a46407320d266f82cb86d452b3082c27b" id="r_a46407320d266f82cb86d452b3082c27b"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a46407320d266f82cb86d452b3082c27b">ck_rmsnorm_rows_bf16_checked</a> (const uint16_t *input, size_t input_elements, const uint16_t *gamma, size_t gamma_elements, uint16_t *output, size_t output_elements, float *work, size_t work_elements, size_t rows, size_t width, float epsilon)</td></tr>
+<tr class="memitem:aafcc69b4e6dad0fe1bbf09881ea1750f" id="r_aafcc69b4e6dad0fe1bbf09881ea1750f"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aafcc69b4e6dad0fe1bbf09881ea1750f">ck_rmsnorm_rows_centered_single_round_bf16_checked</a> (const uint16_t *input, size_t input_elements, const uint16_t *gamma, size_t gamma_elements, uint16_t *output, size_t output_elements, float *work, size_t work_elements, size_t rows, size_t width, float epsilon)</td></tr>
 <tr class="memitem:a43f6d42d441f677ceda5b27f86ddccb4" id="r_a43f6d42d441f677ceda5b27f86ddccb4"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a43f6d42d441f677ceda5b27f86ddccb4">ck_rmsnorm_rows_weighted_single_round_bf16_checked</a> (const uint16_t *input, size_t input_elements, const uint16_t *gamma, size_t gamma_elements, uint16_t *output, size_t output_elements, float *work, size_t work_elements, size_t rows, size_t width, float epsilon)</td></tr>
 <tr class="memitem:a2e1b2d3a2d931e48cee84b3ead04b739" id="r_a2e1b2d3a2d931e48cee84b3ead04b739"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a2e1b2d3a2d931e48cee84b3ead04b739">overlap</a> (const void *a, size_t a_bytes, const void *b, size_t b_bytes)</td></tr>
 <tr class="memitem:a8af41368bacfa2fcccf9371798fc72ac" id="r_a8af41368bacfa2fcccf9371798fc72ac"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a8af41368bacfa2fcccf9371798fc72ac">rmsnorm_rows_bf16_checked</a> (const uint16_t *input, size_t input_elements, const uint16_t *gamma, size_t gamma_elements, uint16_t *output, size_t output_elements, float *work, size_t work_elements, size_t rows, size_t width, float epsilon, <a class="el" href="#a6500c588a9aa68f448efe40463f271c3">rmsnorm_forward_fn</a> normalize)</td></tr>
@@ -239,6 +240,82 @@ Functions</h2></td></tr>
 <div class="ttc" id="armsnorm__bf16__checked_8c_html_a8af41368bacfa2fcccf9371798fc72ac"><div class="ttname"><a href="#a8af41368bacfa2fcccf9371798fc72ac">rmsnorm_rows_bf16_checked</a></div><div class="ttdeci">static int rmsnorm_rows_bf16_checked(const uint16_t *input, size_t input_elements, const uint16_t *gamma, size_t gamma_elements, uint16_t *output, size_t output_elements, float *work, size_t work_elements, size_t rows, size_t width, float epsilon, rmsnorm_forward_fn normalize)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__bf16__checked_8c_source.html#l00025">rmsnorm_bf16_checked.c:25</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="rmsnorm__kernels_8c_source.html#l00426">rmsnorm_forward_pytorch_bf16_storage()</a>, and <a class="el" href="rmsnorm__bf16__checked_8c_source.html#l00025">rmsnorm_rows_bf16_checked()</a>.</p>
+
+</div>
+</div>
+<a id="aafcc69b4e6dad0fe1bbf09881ea1750f" name="aafcc69b4e6dad0fe1bbf09881ea1750f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aafcc69b4e6dad0fe1bbf09881ea1750f">&#9670;&#160;</a></span>ck_rmsnorm_rows_centered_single_round_bf16_checked()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_rmsnorm_rows_centered_single_round_bf16_checked </td>
+          <td>(</td>
+          <td class="paramtype">const uint16_t *</td>          <td class="paramname"><span class="paramname"><em>input</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>input_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const uint16_t *</td>          <td class="paramname"><span class="paramname"><em>gamma</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>gamma_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint16_t *</td>          <td class="paramname"><span class="paramname"><em>output</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>output_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *</td>          <td class="paramname"><span class="paramname"><em>work</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>work_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>rows</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>width</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float</td>          <td class="paramname"><span class="paramname"><em>epsilon</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="rmsnorm__bf16__checked_8c_source.html#l00103">103</a> of file <a class="el" href="rmsnorm__bf16__checked_8c_source.html">rmsnorm_bf16_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  107</span>{</div>
+<div class="line"><span class="lineno">  108</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="#a8af41368bacfa2fcccf9371798fc72ac">rmsnorm_rows_bf16_checked</a>(input, input_elements, gamma, gamma_elements,</div>
+<div class="line"><span class="lineno">  109</span>        output, output_elements, work, work_elements, rows, width, epsilon,</div>
+<div class="line"><span class="lineno">  110</span>        <a class="code hl_function" href="ckernel__engine_8h.html#ae1a6abc49e4fb2e3e65f0f105e357e1f">rmsnorm_forward_muse_centered_pytorch_bf16_storage</a>);</div>
+<div class="line"><span class="lineno">  111</span>}</div>
+<div class="ttc" id="ackernel__engine_8h_html_ae1a6abc49e4fb2e3e65f0f105e357e1f"><div class="ttname"><a href="ckernel__engine_8h.html#ae1a6abc49e4fb2e3e65f0f105e357e1f">rmsnorm_forward_muse_centered_pytorch_bf16_storage</a></div><div class="ttdeci">void rmsnorm_forward_muse_centered_pytorch_bf16_storage(const float *input, const float *zero_centered_weight, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00470">rmsnorm_kernels.c:470</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="rmsnorm__kernels_8c_source.html#l00470">rmsnorm_forward_muse_centered_pytorch_bf16_storage()</a>, and <a class="el" href="rmsnorm__bf16__checked_8c_source.html#l00025">rmsnorm_rows_bf16_checked()</a>.</p>
 
 </div>
 </div>
@@ -503,7 +580,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="true__bpe_8h_source.html#l00211">count</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="rmsnorm__bf16__checked_8c_source.html#l00016">overlap()</a>, and <a class="el" href="rmsnorm__bf16__checked_8c_source.html#l00010">valid_span()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="rmsnorm__bf16__checked_8c_source.html#l00083">ck_rmsnorm_rows_bf16_checked()</a>, and <a class="el" href="rmsnorm__bf16__checked_8c_source.html#l00093">ck_rmsnorm_rows_weighted_single_round_bf16_checked()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="rmsnorm__bf16__checked_8c_source.html#l00083">ck_rmsnorm_rows_bf16_checked()</a>, <a class="el" href="rmsnorm__bf16__checked_8c_source.html#l00103">ck_rmsnorm_rows_centered_single_round_bf16_checked()</a>, and <a class="el" href="rmsnorm__bf16__checked_8c_source.html#l00093">ck_rmsnorm_rows_weighted_single_round_bf16_checked()</a>.</p>
 
 </div>
 </div>

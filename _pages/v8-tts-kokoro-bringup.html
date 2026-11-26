@@ -588,6 +588,22 @@ map resolution and generated execution. Reproduce segment timings with
 <code>version/v8/tts/evidence/profile_qwen3_tts_generated.py</code> and the
 pinned model directory in <code>CKE_QWEN3_TTS_MODEL_DIR</code>. This does not
 provide variable text, a persistent request session or audio streaming.</p>
+<h3>Experimental Base speaker conditioning</h3>
+<p>Qwen3-TTS 0.6B Base accepts a 1,024-value speaker vector extracted from your recording. Prepare a local mono 24 kHz WAV, then use the pinned Qwen publisher environment to extract the vector. Set <code>QWEN_BASE</code> to a local copy of <code>Qwen/Qwen3-TTS-12Hz-0.6B-Base</code> at revision <code>5d83992436eae1d760afd27aff78a71d676296fc</code>.</p>
+<pre><code>import os
+import numpy as np
+import torch
+from qwen_tts import Qwen3TTSModel
+
+model = Qwen3TTSModel.from_pretrained(os.environ["QWEN_BASE"], device_map="cpu",
+                                      dtype=torch.float32, attn_implementation="eager")
+prompt = model.create_voice_clone_prompt(ref_audio="reference.wav", x_vector_only_mode=True)
+np.save("speaker.npy", prompt[0].ref_spk_embedding.detach().cpu().float().numpy().reshape(1024))</code></pre>
+<p>From the CKE checkout, try the bounded native path:</p>
+<pre><code>python version/v8/tts/qwen3_tts_pinned_session.py --runtime-prompts \
+  --model-dir "$QWEN_BASE" --speaker-vector ./speaker.npy \
+  --text "Lift off." --output ./trial.wav</code></pre>
+<p>Native prefill matched all 16 first-frame codec IDs from the publisher's FP32 non-streaming greedy run on one private reference. Continuation exhausted the native frame budget on the tested prompts. A completed personal-voice narration currently requires the publisher path. To hear its reference rendition, reuse <code>prompt</code> with <code>model.generate_voice_clone(text="The motor is spinning.", language="English", voice_clone_prompt=prompt)</code>. Keep recordings and speaker vectors local.</p>
 <p><strong>Qwen3-TTS pinned native speech session:</strong> the bounded
 <code>version/v8/tts/qwen3_tts_pinned_session.py</code> command verifies the
 pinned model files, derives the certified prompt IDs with the model tokenizer,

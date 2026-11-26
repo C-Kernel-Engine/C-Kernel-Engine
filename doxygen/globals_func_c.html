@@ -342,7 +342,7 @@ $(function(){initNavTree('globals_func_c.html','',''); });
 <li>ck_frozen_dx_work()&#160;:&#160;<a class="el" href="ck__parallel__train_8c.html#a236b44775310c5ae4f182bd431beecba">ck_parallel_train.c</a></li>
 <li>ck_gather_rows_bf16_checked()&#160;:&#160;<a class="el" href="gather__rows__bf16__checked_8c.html#a51bddf5d6f0f2d444666a50e34c068b7">gather_rows_bf16_checked.c</a></li>
 <li>ck_geglu_quick_fp16_init()&#160;:&#160;<a class="el" href="geglu__kernels_8c.html#a27c144b4c5f41b5573f53214034dd0cb">geglu_kernels.c</a></li>
-<li>ck_geglu_tanh_bf16_checked()&#160;:&#160;<a class="el" href="bf16__checked__tensor__ops_8c.html#a89a37a5409386887648f4084eb6397c2">bf16_checked_tensor_ops.c</a></li>
+<li>ck_geglu_tanh_bf16_checked()&#160;:&#160;<a class="el" href="bf16__checked__tensor__ops_8c.html#a89a37a5409386887648f4084eb6397c2">bf16_checked_tensor_ops.c</a>, <a class="el" href="routed__geglu__bf16__checked_8c.html#ad247f82b0a5b23793d966f0b4908157f">routed_geglu_bf16_checked.c</a></li>
 <li>ck_gelu_erf_backward_bf16()&#160;:&#160;<a class="el" href="ckernel__head__backward_8h.html#a7d99b72a311398a55492652dcb4b73a2">ckernel_head_backward.h</a>, <a class="el" href="head__backward__bf16_8c.html#a7d99b72a311398a55492652dcb4b73a2">head_backward_bf16.c</a></li>
 <li>ck_gelu_erf_backward_f32()&#160;:&#160;<a class="el" href="ckernel__head__backward_8h.html#a1d5db8117fd940706459fea847f5300e">ckernel_head_backward.h</a>, <a class="el" href="head__backward_8c.html#a1d5db8117fd940706459fea847f5300e">head_backward.c</a></li>
 <li>ck_gelu_erf_fp64_parallel_work()&#160;:&#160;<a class="el" href="gelu__kernels_8c.html#a5bad3e98efcaf996272c57b45c43d60b">gelu_kernels.c</a></li>
@@ -501,8 +501,8 @@ $(function(){initNavTree('globals_func_c.html','',''); });
 <li>ck_layernorm_row_fixed_chunk4_f32()&#160;:&#160;<a class="el" href="ckernel__normalization__checked_8h.html#aa8be856b00a74c14fa4eae04a63fd77b">ckernel_normalization_checked.h</a>, <a class="el" href="layernorm__kernels_8c.html#aa8be856b00a74c14fa4eae04a63fd77b">layernorm_kernels.c</a></li>
 <li>ck_layout_head_to_token_f32()&#160;:&#160;<a class="el" href="ckernel__engine_8h.html#a687568ddefa9d991d3ef5bf22fdc634a">ckernel_engine.h</a>, <a class="el" href="layout__kernels_8c.html#a687568ddefa9d991d3ef5bf22fdc634a">layout_kernels.c</a></li>
 <li>ck_layout_token_to_head_f32()&#160;:&#160;<a class="el" href="ckernel__engine_8h.html#a5c2ef02aaab290a0933ffe1ae0564db0">ckernel_engine.h</a>, <a class="el" href="layout__kernels_8c.html#a5c2ef02aaab290a0933ffe1ae0564db0">layout_kernels.c</a></li>
-<li>ck_linear_rows_bf16_blas_checked()&#160;:&#160;<a class="el" href="linear__rows__bf16__checked_8c.html#a7c7946f7f5bc18d3e9d9d643edcd7e20">linear_rows_bf16_checked.c</a></li>
-<li>ck_linear_rows_bf16_checked()&#160;:&#160;<a class="el" href="linear__rows__bf16__checked_8c.html#aa859d5718cd35edd7b2c60811f7391dc">linear_rows_bf16_checked.c</a></li>
+<li>ck_linear_rows_bf16_blas_checked()&#160;:&#160;<a class="el" href="linear__rows__bf16__checked_8c.html#a7c7946f7f5bc18d3e9d9d643edcd7e20">linear_rows_bf16_checked.c</a>, <a class="el" href="routed__geglu__bf16__checked_8c.html#aebeef1f53e73d9272b4857842f637050">routed_geglu_bf16_checked.c</a></li>
+<li>ck_linear_rows_bf16_checked()&#160;:&#160;<a class="el" href="linear__rows__bf16__checked_8c.html#aa859d5718cd35edd7b2c60811f7391dc">linear_rows_bf16_checked.c</a>, <a class="el" href="routed__geglu__bf16__checked_8c.html#ac87421f9c9f5d33ba57368bbe7768753">routed_geglu_bf16_checked.c</a></li>
 <li>ck_llama_kv_pad_256()&#160;:&#160;<a class="el" href="attention__kernels_8c.html#a73d8b139e9de74e398c9f3df0a75756e">attention_kernels.c</a></li>
 <li>ck_llama_regular_dot_f16()&#160;:&#160;<a class="el" href="attention__kernels_8c.html#aa695eb09451351d18929b33a59acb333">attention_kernels.c</a></li>
 <li>ck_llama_regular_gemm_f16()&#160;:&#160;<a class="el" href="attention__kernels_8c.html#a1c1f48d0fa92a6b126cf7bb82b5bbf10">attention_kernels.c</a></li>
@@ -745,8 +745,10 @@ $(function(){initNavTree('globals_func_c.html','',''); });
 <li>ck_resolve_ggml_view_3d()&#160;:&#160;<a class="el" href="attention__oracle__ggml_8c.html#a2eaedda8dcec9f12cdaecbdb6324e534">attention_oracle_ggml.c</a>, <a class="el" href="rope__kernels_8c.html#a2eaedda8dcec9f12cdaecbdb6324e534">rope_kernels.c</a></li>
 <li>ck_rmsnorm_provider_name()&#160;:&#160;<a class="el" href="rmsnorm__kernels_8c.html#ac84f44f358ab2938364e36c4ed34e878">rmsnorm_kernels.c</a></li>
 <li>ck_rmsnorm_rows_bf16_checked()&#160;:&#160;<a class="el" href="rmsnorm__bf16__checked_8c.html#a46407320d266f82cb86d452b3082c27b">rmsnorm_bf16_checked.c</a></li>
+<li>ck_rmsnorm_rows_centered_single_round_bf16_checked()&#160;:&#160;<a class="el" href="rmsnorm__bf16__checked_8c.html#aafcc69b4e6dad0fe1bbf09881ea1750f">rmsnorm_bf16_checked.c</a></li>
 <li>ck_rmsnorm_rows_weighted_single_round_bf16_checked()&#160;:&#160;<a class="el" href="rmsnorm__bf16__checked_8c.html#a43f6d42d441f677ceda5b27f86ddccb4">rmsnorm_bf16_checked.c</a></li>
 <li>ck_rope_ensure_ggml_loaded()&#160;:&#160;<a class="el" href="rope__kernels_8c.html#a4ef11be6ebef160544f26df8389e273a">rope_kernels.c</a></li>
+<li>ck_rope_interleaved_partial_bf16_checked()&#160;:&#160;<a class="el" href="bf16__checked__tensor__ops_8c.html#aaa8aaf22a43de37b9aa9ca5bb8439674">bf16_checked_tensor_ops.c</a></li>
 <li>ck_rope_reference_cosf()&#160;:&#160;<a class="el" href="rope__kernels_8c.html#aad7c9e4161a32a364dbf503b02623ce2">rope_kernels.c</a></li>
 <li>ck_rope_reference_powf()&#160;:&#160;<a class="el" href="rope__kernels_8c.html#a727e05d3e39e6f2fe643e5c625e48fe1">rope_kernels.c</a></li>
 <li>ck_rope_reference_sinf()&#160;:&#160;<a class="el" href="rope__kernels_8c.html#a68d4209b93213b25e11f3d20167f6444">rope_kernels.c</a></li>
@@ -756,6 +758,7 @@ $(function(){initNavTree('globals_func_c.html','',''); });
 <li>ck_round_fp16_buffer()&#160;:&#160;<a class="el" href="attention__kernels_8c.html#a643edbfcea466ae909717441999a5076">attention_kernels.c</a></li>
 <li>ck_round_fp16_scalar()&#160;:&#160;<a class="el" href="attention__kernels_8c.html#a7370e06b912ac95b7db664d269adfb90">attention_kernels.c</a></li>
 <li>ck_round_nearest()&#160;:&#160;<a class="el" href="gemv__fused__quant__bias_8c.html#a660bceafec3070fd7d631ab171f423dd">gemv_fused_quant_bias.c</a></li>
+<li>ck_routed_geglu_bf16_checked()&#160;:&#160;<a class="el" href="routed__geglu__bf16__checked_8c.html#aae52c181e529d5bf0700d38e6d1132dd">routed_geglu_bf16_checked.c</a></li>
 <li>ck_run_checked_frame_codec()&#160;:&#160;<a class="el" href="ckernel__checked__frame__codec_8h.html#a90fac66574181b161cc9b001dffd0d6a">ckernel_checked_frame_codec.h</a>, <a class="el" href="checked__frame__codec_8c.html#a90fac66574181b161cc9b001dffd0d6a">checked_frame_codec.c</a></li>
 <li>ck_run_checked_frame_codec_prefix()&#160;:&#160;<a class="el" href="ckernel__checked__frame__codec_8h.html#a9b947317e47bf0a83c8686a306f156e7">ckernel_checked_frame_codec.h</a>, <a class="el" href="checked__frame__codec_8c.html#a9b947317e47bf0a83c8686a306f156e7">checked_frame_codec.c</a></li>
 <li>ck_run_checked_frame_codec_prefix_control()&#160;:&#160;<a class="el" href="ckernel__checked__frame__codec_8h.html#a1a2fa4a049badc1d2d52f7103c6c76db">ckernel_checked_frame_codec.h</a>, <a class="el" href="checked__frame__codec_8c.html#a1a2fa4a049badc1d2d52f7103c6c76db">checked_frame_codec.c</a></li>
@@ -794,6 +797,8 @@ $(function(){initNavTree('globals_func_c.html','',''); });
 <li>ck_scale_bf16_checked()&#160;:&#160;<a class="el" href="bf16__checked__tensor__ops_8c.html#aec2f1df16f3e6584e7e0ac97a980b174">bf16_checked_tensor_ops.c</a></li>
 <li>ck_scale_f32_to_f16()&#160;:&#160;<a class="el" href="fp16__convert_8c.html#a12577269c5f3d0e090c2f0190966d306">fp16_convert.c</a></li>
 <li>ck_scale_parallel_work()&#160;:&#160;<a class="el" href="optimizer__kernels_8c.html#a47011358c2861776076ba39710b34455">optimizer_kernels.c</a></li>
+<li>ck_scale_rows_bf16_checked()&#160;:&#160;<a class="el" href="bf16__checked__tensor__ops_8c.html#a2802aab0189843941cb9c5bbd601e89d">bf16_checked_tensor_ops.c</a></li>
+<li>ck_scale_scalar_f32_bf16_checked()&#160;:&#160;<a class="el" href="bf16__checked__tensor__ops_8c.html#a3260bd9616ca755c9d0ab0ccd7ec35e1">bf16_checked_tensor_ops.c</a></li>
 <li>ck_scale_vector_backward_f32()&#160;:&#160;<a class="el" href="ckernel__head__backward_8h.html#a38a1d265ee1f4c57319254b09a3fdd22">ckernel_head_backward.h</a>, <a class="el" href="decision__scoring__backward_8c.html#a38a1d265ee1f4c57319254b09a3fdd22">decision_scoring_backward.c</a></li>
 <li>ck_scale_vector_f32()&#160;:&#160;<a class="el" href="ckernel__decision__tensor__ops_8h.html#a5d28199a889d048ce31328685d05ad60">ckernel_decision_tensor_ops.h</a>, <a class="el" href="decision__tensor__ops_8c.html#a5d28199a889d048ce31328685d05ad60">decision_tensor_ops.c</a></li>
 <li>ck_section_config_init()&#160;:&#160;<a class="el" href="ckernel__section__layout_8h.html#a45ba8ddf4f1d6280681d37136dbc3a5a">ckernel_section_layout.h</a></li>
@@ -835,6 +840,7 @@ $(function(){initNavTree('globals_func_c.html','',''); });
 <li>ck_set_num_threads()&#160;:&#160;<a class="el" href="ckernel__engine_8h.html#a2b48c2a890de67e5830bc4239e01bd13">ckernel_engine.h</a>, <a class="el" href="ckernel__strict_8c.html#a2b48c2a890de67e5830bc4239e01bd13">ckernel_strict.c</a></li>
 <li>ck_set_strict_parity()&#160;:&#160;<a class="el" href="ckernel__engine_8h.html#a8bcb6fa03c4861c8f45d59fa424d1146">ckernel_engine.h</a>, <a class="el" href="ckernel__strict_8c.html#a8bcb6fa03c4861c8f45d59fa424d1146">ckernel_strict.c</a></li>
 <li>ck_sigmoid_bf16()&#160;:&#160;<a class="el" href="hyper__connection__kernels_8c.html#a01609ec0952da9be3347459e153d2859">hyper_connection_kernels.c</a></li>
+<li>ck_sigmoid_mul_bf16_checked()&#160;:&#160;<a class="el" href="bf16__checked__tensor__ops_8c.html#a7af77524a7a016325e2075b8e64a58af">bf16_checked_tensor_ops.c</a></li>
 <li>ck_sliding_attention_compute_one()&#160;:&#160;<a class="el" href="attention__kernels__sliding_8c.html#a9d02ee81426f42c962f04362b2e1a138">attention_kernels_sliding.c</a></li>
 <li>ck_sliding_attention_parallel_disabled()&#160;:&#160;<a class="el" href="attention__kernels__sliding_8c.html#a4a0c48a01997d7cd6e335445bb2ec65d">attention_kernels_sliding.c</a></li>
 <li>ck_sliding_attention_pick_threads()&#160;:&#160;<a class="el" href="attention__kernels__sliding_8c.html#a349f41453f9d1add857dbf9e6fdb1c75">attention_kernels_sliding.c</a></li>
@@ -1040,6 +1046,7 @@ $(function(){initNavTree('globals_func_c.html','',''); });
 <li>ck_vec_max_f32_contig()&#160;:&#160;<a class="el" href="attention__kernels_8c.html#a4732fa5e87a358c289e7049edf66b06f">attention_kernels.c</a></li>
 <li>ck_vec_scale_f32_inplace()&#160;:&#160;<a class="el" href="attention__kernels_8c.html#a37d63d4c4865a3889072ac48e0dc22e2">attention_kernels.c</a></li>
 <li>ck_weight_dtype_expr()&#160;:&#160;<a class="el" href="ckernel__codegen_8c.html#a833fe82b77d80b8f294aaf00f6627a00">ckernel_codegen.c</a>, <a class="el" href="ckernel__codegen__v6_85_8c.html#a833fe82b77d80b8f294aaf00f6627a00">ckernel_codegen_v6.5.c</a>, <a class="el" href="ckernel__codegen__v6_86_8c.html#a833fe82b77d80b8f294aaf00f6627a00">ckernel_codegen_v6.6.c</a>, <a class="el" href="ckernel__codegen__v6_8c.html#a833fe82b77d80b8f294aaf00f6627a00">ckernel_codegen_v6.c</a></li>
+<li>ck_widen_bf16_checked()&#160;:&#160;<a class="el" href="bf16__checked__tensor__ops_8c.html#a30b7cb92c6af2ba1a81e652b068482d3">bf16_checked_tensor_ops.c</a></li>
 <li>ckernel_backend_native()&#160;:&#160;<a class="el" href="ckernel__engine_8h.html#a6c6a2e37aa74b6f118d94eb08debcff3">ckernel_engine.h</a>, <a class="el" href="backend__native_8c.html#a6c6a2e37aa74b6f118d94eb08debcff3">backend_native.c</a></li>
 <li>ckernel_sgemm_native()&#160;:&#160;<a class="el" href="backend__native_8c.html#a9008610196b2d6750454c58f87a6cc78">backend_native.c</a></li>
 <li>clamp_int8()&#160;:&#160;<a class="el" href="rmsnorm__kernels__int8_8c.html#a0296ca33e8e3ca947f0b2368c526aacd">rmsnorm_kernels_int8.c</a></li>
