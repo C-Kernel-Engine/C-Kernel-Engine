@@ -1,0 +1,205 @@
+{
+  "id": "rmsnorm_rows_weighted_single_round_bf16_checked",
+  "op": "rmsnorm_rows_bf16_checked",
+  "operation_interface": "rmsnorm.row_major.compact_bf16.weighted_single_round.checked.v1",
+  "variant": "fp32_reciprocal_sqrt_weighted_bf16_store",
+  "quant": {
+    "weight": "bf16",
+    "activation": "bf16",
+    "output": "bf16"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "bf16",
+      "shape": [
+        "M",
+        "K"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [
+    {
+      "name": "gamma",
+      "dtype": "bf16",
+      "shape": [
+        "K"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "bf16",
+      "shape": [
+        "M",
+        "K"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "work",
+      "dtype": "fp32",
+      "shape": [
+        "M*K+K"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required",
+      "size_bytes": "4 * (M * K + K)",
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64
+    }
+  ],
+  "dims": [
+    "M",
+    "K"
+  ],
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "impl": {
+    "function": "ck_rmsnorm_rows_weighted_single_round_bf16_checked",
+    "c_declaration": "int ck_rmsnorm_rows_weighted_single_round_bf16_checked(const uint16_t *input, size_t input_elements, const uint16_t *gamma, size_t gamma_elements, uint16_t *output, size_t output_elements, float *work, size_t work_elements, size_t rows, size_t width, float epsilon);",
+    "sources": [
+      "src/kernels/rmsnorm_bf16_checked.c",
+      "src/kernels/rmsnorm_kernels.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const uint16_t*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "input_elements",
+        "source": "runtime:input_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "gamma",
+        "source": "weight:gamma",
+        "cast": "const uint16_t*",
+        "ports": [
+          "weight:gamma"
+        ]
+      },
+      {
+        "name": "gamma_elements",
+        "source": "runtime:gamma_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "uint16_t*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "work",
+        "source": "scratch:work",
+        "cast": "float*"
+      },
+      {
+        "name": "work_elements",
+        "source": "runtime:work_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "rows",
+        "source": "runtime:rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "width",
+        "source": "runtime:width",
+        "value_type": "size_t"
+      },
+      {
+        "name": "epsilon",
+        "source": "param:epsilon"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "M": "rows",
+      "K": "width"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "input_elements",
+        "rows": "rows",
+        "width": "width",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "gamma",
+        "elements": "gamma_elements",
+        "rows": 1,
+        "width": "width",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": "rows",
+        "width": "width",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "work",
+        "elements": "work_elements",
+        "rows": 1,
+        "width": "work_elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_bison_backbone_ingress.py"
+    ],
+    "oracle": "PyTorch FP32 mean square, reciprocal square root and weighting with a single BF16 store."
+  },
+  "notes": "Row-major compact BF16 RMSNorm. Compute (x * (1/sqrt(mean(x*x) + epsilon))) * gamma in FP32 before BF16 storage. FP32 sum order depends on compiled ISA. Output is unchanged on failure."
+}
