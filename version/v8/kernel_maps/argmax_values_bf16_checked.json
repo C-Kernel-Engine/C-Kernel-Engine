@@ -1,0 +1,119 @@
+{
+  "id": "argmax_values_bf16_checked",
+  "op": "argmax_values_bf16_checked",
+  "operation_interface": "tensor.argmax.first_index.compact_bf16.checked.v1",
+  "variant": "finite_first_index_on_tie",
+  "quant": {
+    "weight": "none",
+    "activation": "bf16",
+    "output": "i32"
+  },
+  "inputs": [
+    {
+      "name": "values",
+      "dtype": "bf16",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "index",
+      "dtype": "i32",
+      "shape": [
+        1
+      ],
+      "layout": "scalar",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "N"
+  ],
+  "params": [],
+  "constraints": {
+    "notes": "Input must be finite; ties select the lowest index."
+  },
+  "impl": {
+    "function": "ck_argmax_values_bf16_checked",
+    "c_declaration": "int ck_argmax_values_bf16_checked(const uint16_t *values, int32_t *index, size_t elements, size_t index_elements);",
+    "sources": [
+      "src/kernels/bf16_checked_tensor_ops.c",
+      "src/kernels/gelu_kernels.c"
+    ]
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "values",
+        "source": "activation:values",
+        "cast": "const uint16_t*",
+        "ports": [
+          "input:values"
+        ]
+      },
+      {
+        "name": "index",
+        "source": "output:index",
+        "cast": "int32_t*",
+        "ports": [
+          "output:index"
+        ]
+      },
+      {
+        "name": "elements",
+        "source": "runtime:elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "index_elements",
+        "source": "runtime:index_elements",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_drama3_bf16_codebook_frame.py"
+    ],
+    "oracle": "The first finite maximum in BF16 storage."
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "N": "elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "values",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "index",
+        "elements": "index_elements",
+        "rows": 1,
+        "width": 1,
+        "element_bytes": 4,
+        "storage_dtype": "i32"
+      }
+    ]
+  }
+}

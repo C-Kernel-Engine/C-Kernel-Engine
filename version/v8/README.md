@@ -252,3 +252,25 @@ provide an LP64 `CK_BLAS_LIBRARY`, and run
 `python -m pytest -q tests/test_v8_drama3_bf16_tower.py`. Without the checkpoint
 ranges the synthetic composition still runs and the pinned test reports SKIP.
 The replay covers one layer with supplied inputs, before native prediction.
+
+The complete teacher-forced ingress plus greedy codebook feedback replay uses
+all four shared layers, nine residual layers, and nine heads. The request
+supplies the first semantic code, a hidden row and the initial enrichment
+sum. Subsequent code IDs are selected in generated C over the codec's 1,024
+legal residual columns and consumed by the next layer. This describes one
+isolated frame with no prior tower cache.
+
+Set `CK_DRAMA3_TOWER_RANGES` to a directory containing the first 1 MiB of shards
+14 and 15 (`shard14.header`, `shard15.header`), plus the following inclusive
+byte ranges from the same pinned safetensors revision.
+
+| Shard | Bytes | Filename |
+| --- | --- | --- |
+| 14 | 168607328–1036948063 | `tower-shard14.bin` |
+| 15 | 15128–1409461015 | `tower-shard15.bin` |
+
+Run `python -m pytest -q tests/test_v8_drama3_bf16_codebook_frame.py` with the
+same BLAS settings. The test hashes both payloads, checks per-head logits and
+greedy IDs against PyTorch, and records local and propagated layer error.
+The pinned real-weight case currently misses the parity gate. The portable
+synthetic pass covers feedback, A→B→A, and rejection/recovery.

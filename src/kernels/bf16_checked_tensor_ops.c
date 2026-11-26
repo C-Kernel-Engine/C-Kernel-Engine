@@ -262,3 +262,24 @@ int ck_scale_scalar_f32_bf16_checked(const uint16_t *input, uint16_t *out,
     memcpy(out, stage, bytes);
     return 0;
 }
+
+int ck_argmax_values_bf16_checked(const uint16_t *values, int32_t *index,
+                                  size_t elements, size_t index_elements)
+{
+    if (!elements || elements > INT32_MAX || index_elements != 1 || !valid_span(values, elements, 2) ||
+        !valid_span(index, 1, 4) || overlaps(values, elements * 2, index, 4))
+        return -2;
+    size_t best = 0;
+    float maximum = -INFINITY;
+    for (size_t i = 0; i < elements; ++i) {
+        const float value = bf16_to_float(values[i]);
+        if (!isfinite(value))
+            return -3;
+        if (value > maximum) {
+            maximum = value;
+            best = i;
+        }
+    }
+    *index = (int32_t)best;
+    return 0;
+}
