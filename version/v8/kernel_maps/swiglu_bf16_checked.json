@@ -1,0 +1,168 @@
+{
+  "id": "swiglu_bf16_checked",
+  "op": "swiglu_bf16_checked",
+  "operation_interface": "tensor.swiglu_bf16_checked.v1",
+  "variant": "ordered_bf16_storage",
+  "quant": {
+    "weight": "none",
+    "activation": "bf16",
+    "output": "bf16"
+  },
+  "inputs": [
+    {
+      "name": "gate",
+      "dtype": "bf16",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "up",
+      "dtype": "bf16",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "bf16",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "output",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "stage",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read_write",
+      "consumption": "required",
+      "size_bytes": "4 * N",
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64
+    }
+  ],
+  "dims": [
+    "N"
+  ],
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "impl": {
+    "function": "ck_swiglu_bf16_checked",
+    "c_declaration": "int ck_swiglu_bf16_checked(const uint16_t *gate, const uint16_t *up, uint16_t *out, float *stage, size_t elements);",
+    "sources": [
+      "src/kernels/bf16_checked_tensor_ops.c",
+      "src/kernels/gelu_kernels.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "gate",
+        "source": "activation:gate",
+        "cast": "const uint16_t*",
+        "ports": [
+          "input:gate"
+        ]
+      },
+      {
+        "name": "up",
+        "source": "activation:up",
+        "cast": "const uint16_t*",
+        "ports": [
+          "input:up"
+        ]
+      },
+      {
+        "name": "out",
+        "source": "output:out",
+        "cast": "uint16_t*",
+        "ports": [
+          "output:out"
+        ]
+      },
+      {
+        "name": "stage",
+        "source": "scratch:stage",
+        "cast": "float*"
+      },
+      {
+        "name": "elements",
+        "source": "runtime:elements",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "N": "elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "gate",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "up",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "out",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "stage",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_sigma_bf16_block.py"
+    ]
+  },
+  "notes": "Round the FP32 SiLU gate to BF16 before multiplying by the up projection, then round the product to BF16."
+}

@@ -193,3 +193,18 @@ ordered FP64 reference provider. `--layers 1` runs only the first layer and save
 its hidden output for diagnosis. `--keep-arena` retains the runtime arena for
 replay. Use a fresh output path for each run. The comparison checks raw scores
 and winner identities. The harness expects pretokenized requests.
+
+### Sigma BF16 denoiser block replay
+
+The generated entry uses explicit positions and key ranges for a nonempty
+block within the pinned 4096-token context. The block can read clean prefix
+K/V as separate BF16 inputs. It combines them with the current block's K/V in
+native code and leaves the prefix unchanged. The fixture compares its output
+with a fresh run over the same prefix and block.
+
+Set `CK_SIGMA_BF16_CHECKPOINT` to the pinned Sigma-3B safetensors and
+`CK_BLAS_LIBRARY` to an LP64 BLAS library that exports `dgemm_`. Run
+`python -m pytest -q tests/test_v8_sigma_bf16_block.py` on an AVX2 host for
+the weight-backed comparison. The test verifies tensor hashes, compares
+against PyTorch's math attention backend, and reports each checkpoint when
+invoked with `-o junit_family=xunit1 --junitxml sigma-block.xml`.

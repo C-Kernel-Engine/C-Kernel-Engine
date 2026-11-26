@@ -5504,6 +5504,8 @@ TEMPLATE_TO_KERNEL_OP = {
     "add_bf16_checked": "add_bf16_checked",
     "scale_bf16_checked": "scale_bf16_checked",
     "geglu_tanh_bf16_checked": "geglu_tanh_bf16_checked",
+    "concat_features_bf16_checked": "concat_features_bf16_checked",
+    "swiglu_bf16_checked": "swiglu_bf16_checked",
     "rope_split_positions_bf16_checked": "rope_split_positions_bf16_checked",
     "attention_ranges_checked": "attention_ranges_checked",
     "indexed_scale_checked": "indexed_scale_checked",

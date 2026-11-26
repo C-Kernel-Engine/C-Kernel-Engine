@@ -6993,6 +6993,7 @@ test-kernel-maps:
 		tests/test_v8_packed_question_layout.py \
 		tests/test_v8_bison_backbone_ingress.py \
 		tests/test_v8_bison_generated_layer.py \
+		tests/test_v8_sigma_bf16_block.py \
 		tests/test_v8_safetensors_to_bump.py::test_gemma4_per_layer_gqa_geometry_survives_import_and_lowering
 	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_gemm_f16_clipped_n8.py
 	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_gemma4_bf16_reduction_oracle.py
