@@ -18,7 +18,7 @@ var searchData=
   ['sections_15',['sections',['../structCKModel.html#ab7a4ebc13bcb370c4dbb36f3357af03a',1,'CKModel']]],
   ['seed_16',['seed',['../structck__guided__flow__request.html#adfad9a036c06d4219a203ebaa44f08e3',1,'ck_guided_flow_request']]],
   ['sequence_5fhandle_17',['sequence_handle',['../structCKModelBatchDecodeRowV8.html#ac7300e4f968b26b20eca6fea82159036',1,'CKModelBatchDecodeRowV8']]],
-  ['sgemm_18',['sgemm',['../structCKMathBackend.html#a7e59ba4baa9c776241287338a219d9c4',1,'CKMathBackend']]],
+  ['sgemm_18',['sgemm',['../structCKMathBackend.html#a7e59ba4baa9c776241287338a219d9c4',1,'CKMathBackend::sgemm'],['../deltanet__chunked__bf16_8c.html#a59b67675e048b6e93272bb4328efbf66',1,'sgemm:&#160;deltanet_chunked_bf16.c']]],
   ['shape_19',['shape',['../structCKIRV2Buffer.html#a22f159608ef2fbcdfdd84704ae3f5da4',1,'CKIRV2Buffer::shape'],['../structCKBufferSpec.html#ae34b00c892e6e3ffd7928a0a31924b59',1,'CKBufferSpec::shape']]],
   ['shared_5fby_5fcores_20',['shared_by_cores',['../structCacheInfo.html#aefdbeadd9d601084c823c530a35e4e5c',1,'CacheInfo']]],
   ['shared_5fscratch_21',['shared_scratch',['../structCKModel.html#a23c5fb291d06cc7cbe7aa8bc2a07b06b',1,'CKModel']]],

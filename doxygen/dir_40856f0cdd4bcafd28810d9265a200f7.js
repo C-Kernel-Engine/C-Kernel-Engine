@@ -50,6 +50,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "decision_scoring_backward.c", "decision__scoring__backward_8c.html", "decision__scoring__backward_8c" ],
     [ "decision_tensor_ops.c", "decision__tensor__ops_8c.html", "decision__tensor__ops_8c" ],
     [ "deepseek_kernels.c", "deepseek__kernels_8c.html", "deepseek__kernels_8c" ],
+    [ "deltanet_chunked_bf16.c", "deltanet__chunked__bf16_8c.html", "deltanet__chunked__bf16_8c" ],
     [ "deltanet_kernels.c", "deltanet__kernels_8c.html", "deltanet__kernels_8c" ],
     [ "depth_residual_mix_checked.c", "depth__residual__mix__checked_8c.html", "depth__residual__mix__checked_8c" ],
     [ "dequant_kernels.c", "dequant__kernels_8c.html", "dequant__kernels_8c" ],

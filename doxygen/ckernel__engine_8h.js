@@ -244,6 +244,7 @@ var ckernel__engine_8h =
     [ "fused_rmsnorm_qkv_scratch_size", "ckernel__engine_8h.html#ab482f93509482dcc7028eb32424ce6cd", null ],
     [ "gated_deltanet_autoregressive_backward", "ckernel__engine_8h.html#a13c4e09c2b0eaea0f19c8b162bb9c377", null ],
     [ "gated_deltanet_autoregressive_forward", "ckernel__engine_8h.html#ab058f3491df124f04213732b3ae76fce", null ],
+    [ "gated_deltanet_chunked_bf16_prefill_forward", "ckernel__engine_8h.html#a367698e9a4f5f8e2f93442b53d99ff6b", null ],
     [ "gated_deltanet_llama_avx2_forward", "ckernel__engine_8h.html#a803959e1de4db14206e1b8fe09b5e3a1", null ],
     [ "gated_deltanet_llama_avx2_prefill_forward", "ckernel__engine_8h.html#a47a99ff5f30a9e1964edb5627c91965c", null ],
     [ "gated_deltanet_llama_chunk64_head_forward", "ckernel__engine_8h.html#ab3e7921d991c947c1bd1b80739c99d22", null ],

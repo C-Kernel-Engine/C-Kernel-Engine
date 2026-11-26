@@ -37,5 +37,6 @@ var searchData=
   ['vocab_5fsize_34',['vocab_size',['../structCKModelRuntimeDescriptorV8.html#af6a006961191329f5cc41410bf97a13e',1,'CKModelRuntimeDescriptorV8::vocab_size'],['../structCKModelConfig.html#ad2b6c5944307859fe26f4d915d089027',1,'CKModelConfig::vocab_size'],['../structCKTokenizer.html#ada5e95a402ab1abb0295df8e1ecccc04',1,'CKTokenizer::vocab_size'],['../structCKBumpHeaderV5.html#a1d7ceb3da86e1cc40493cf185e486507',1,'CKBumpHeaderV5::vocab_size'],['../structCKSectionConfig.html#a2dc3bafd010bc86e6879784f37c2cf26',1,'CKSectionConfig::vocab_size'],['../structCKTokenizer.html#a2993f4ea714c7d2996caccf32eb9ddef',1,'CKTokenizer::vocab_size'],['../true__bpe_8h.html#aa47c8f70dd1f7e8ed4d6c282015f9697',1,'vocab_size:&#160;true_bpe.h']]],
   ['vocab_5fstrings_35',['vocab_strings',['../structQWEN2__0__5B__DECODEHeaderOffsets.html#a60e3a70cccede22b6473dd0be408af24',1,'QWEN2_0_5B_DECODEHeaderOffsets']]],
   ['vocab_5ftrie_36',['vocab_trie',['../structCKTokenizer.html#a6ac6c2255e6c5ccf7dfc45ecf2be9456',1,'CKTokenizer']]],
-  ['vocabulary_5fsize_37',['vocabulary_size',['../structCKDecoderFeatures.html#ab304219bf87b0d271ffdd9ab9b26db8c',1,'CKDecoderFeatures']]]
+  ['vocabulary_5fsize_37',['vocabulary_size',['../structCKDecoderFeatures.html#ab304219bf87b0d271ffdd9ab9b26db8c',1,'CKDecoderFeatures']]],
+  ['vsexp_38',['vsexp',['../deltanet__chunked__bf16_8c.html#a1fa72e6a19202f986c8ed7f84b719f0e',1,'deltanet_chunked_bf16.c']]]
 ];

@@ -279,8 +279,8 @@ $(function(){initNavTree('gemm__microkernel_8c_source.html','',''); });
 <div class="line"><a id="l00151" name="l00151"></a><span class="lineno">  151</span>    dnnl_matmul_primitive_desc_create(&amp;matmul_pd, g_engine, a_md, b_md, NULL, c_md, NULL);</div>
 <div class="line"><a id="l00152" name="l00152"></a><span class="lineno">  152</span> </div>
 <div class="line"><a id="l00153" name="l00153"></a><span class="lineno">  153</span>    <span class="comment">// Create primitive</span></div>
-<div class="line"><a id="l00154" name="l00154"></a><span class="lineno">  154</span>    dnnl_primitive_t matmul;</div>
-<div class="line"><a id="l00155" name="l00155"></a><span class="lineno">  155</span>    dnnl_primitive_create(&amp;matmul, matmul_pd);</div>
+<div class="line"><a id="l00154" name="l00154"></a><span class="lineno">  154</span>    dnnl_primitive_t <a class="code hl_function" href="deltanet__chunked__bf16_8c.html#a5633679eb79f2e0ee8a4dfec73bd67de">matmul</a>;</div>
+<div class="line"><a id="l00155" name="l00155"></a><span class="lineno">  155</span>    dnnl_primitive_create(&amp;<a class="code hl_function" href="deltanet__chunked__bf16_8c.html#a5633679eb79f2e0ee8a4dfec73bd67de">matmul</a>, matmul_pd);</div>
 <div class="line"><a id="l00156" name="l00156"></a><span class="lineno">  156</span> </div>
 <div class="line"><a id="l00157" name="l00157"></a><span class="lineno">  157</span>    <span class="comment">// Create memory objects</span></div>
 <div class="line"><a id="l00158" name="l00158"></a><span class="lineno">  158</span>    dnnl_memory_t a_mem, b_mem, c_mem;</div>
@@ -294,11 +294,11 @@ $(function(){initNavTree('gemm__microkernel_8c_source.html','',''); });
 <div class="line"><a id="l00166" name="l00166"></a><span class="lineno">  166</span>        {DNNL_ARG_WEIGHTS, b_mem},</div>
 <div class="line"><a id="l00167" name="l00167"></a><span class="lineno">  167</span>        {DNNL_ARG_DST, c_mem}</div>
 <div class="line"><a id="l00168" name="l00168"></a><span class="lineno">  168</span>    };</div>
-<div class="line"><a id="l00169" name="l00169"></a><span class="lineno">  169</span>    dnnl_primitive_execute(matmul, g_stream, 3, args);</div>
+<div class="line"><a id="l00169" name="l00169"></a><span class="lineno">  169</span>    dnnl_primitive_execute(<a class="code hl_function" href="deltanet__chunked__bf16_8c.html#a5633679eb79f2e0ee8a4dfec73bd67de">matmul</a>, g_stream, 3, args);</div>
 <div class="line"><a id="l00170" name="l00170"></a><span class="lineno">  170</span>    dnnl_stream_wait(g_stream);</div>
 <div class="line"><a id="l00171" name="l00171"></a><span class="lineno">  171</span> </div>
 <div class="line"><a id="l00172" name="l00172"></a><span class="lineno">  172</span>    <span class="comment">// Cleanup</span></div>
-<div class="line"><a id="l00173" name="l00173"></a><span class="lineno">  173</span>    dnnl_primitive_destroy(matmul);</div>
+<div class="line"><a id="l00173" name="l00173"></a><span class="lineno">  173</span>    dnnl_primitive_destroy(<a class="code hl_function" href="deltanet__chunked__bf16_8c.html#a5633679eb79f2e0ee8a4dfec73bd67de">matmul</a>);</div>
 <div class="line"><a id="l00174" name="l00174"></a><span class="lineno">  174</span>    dnnl_primitive_desc_destroy(matmul_pd);</div>
 <div class="line"><a id="l00175" name="l00175"></a><span class="lineno">  175</span>    dnnl_memory_destroy(a_mem);</div>
 <div class="line"><a id="l00176" name="l00176"></a><span class="lineno">  176</span>    dnnl_memory_destroy(b_mem);</div>
@@ -1312,6 +1312,7 @@ $(function(){initNavTree('gemm__microkernel_8c_source.html','',''); });
 <div class="ttc" id="ackernel__strict_8c_html_adcc8293c7a06a4f12c2acfccb8d3cac0"><div class="ttname"><a href="ckernel__strict_8c.html#adcc8293c7a06a4f12c2acfccb8d3cac0">g_threads_initialized</a></div><div class="ttdeci">static int g_threads_initialized</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00151">ckernel_strict.c:151</a></div></div>
 <div class="ttc" id="acpu__features_8h_html"><div class="ttname"><a href="cpu__features_8h.html">cpu_features.h</a></div></div>
 <div class="ttc" id="acpu__features_8h_html_a72d28b72d616253f12ef0eff36325cba"><div class="ttname"><a href="cpu__features_8h.html#a72d28b72d616253f12ef0eff36325cba">get_cpu_info</a></div><div class="ttdeci">const CPUInfo * get_cpu_info(void)</div><div class="ttdef"><b>Definition</b> <a href="cpu__features_8c_source.html#l00409">cpu_features.c:409</a></div></div>
+<div class="ttc" id="adeltanet__chunked__bf16_8c_html_a5633679eb79f2e0ee8a4dfec73bd67de"><div class="ttname"><a href="deltanet__chunked__bf16_8c.html#a5633679eb79f2e0ee8a4dfec73bd67de">matmul</a></div><div class="ttdeci">static void matmul(int rows, int columns, int depth, const float *a, const float *b, int transpose_a, int transpose_b, float *c)</div><div class="ttdef"><b>Definition</b> <a href="deltanet__chunked__bf16_8c_source.html#l00060">deltanet_chunked_bf16.c:60</a></div></div>
 <div class="ttc" id="agemm__microkernel_8c_html_a18bfcedb9d45538774be02d4b68f0b67"><div class="ttname"><a href="gemm__microkernel_8c.html#a18bfcedb9d45538774be02d4b68f0b67">gemm_microkernel_edge</a></div><div class="ttdeci">static void gemm_microkernel_edge(int m, int n, int K, const float *A, int lda, const float *B, int ldb, float *C, int ldc, int first_k)</div><div class="ttdef"><b>Definition</b> <a href="#l00737">gemm_microkernel.c:737</a></div></div>
 <div class="ttc" id="agemm__microkernel_8c_html_a1eaf653ddeb5638bd73838e59f35f065"><div class="ttname"><a href="gemm__microkernel_8c.html#a1eaf653ddeb5638bd73838e59f35f065">GEMM_BACKEND</a></div><div class="ttdeci">#define GEMM_BACKEND</div><div class="ttdef"><b>Definition</b> <a href="#l00045">gemm_microkernel.c:45</a></div></div>
 <div class="ttc" id="agemm__microkernel_8c_html_a1fa2460e32327ade49189c95740bc1b5"><div class="ttname"><a href="gemm__microkernel_8c.html#a1fa2460e32327ade49189c95740bc1b5">NC</a></div><div class="ttdeci">#define NC</div><div class="ttdef"><b>Definition</b> <a href="#l00229">gemm_microkernel.c:229</a></div></div>

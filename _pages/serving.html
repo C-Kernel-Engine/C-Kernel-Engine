@@ -307,3 +307,39 @@ loaded identity retains model initialization time separately. Kokoro currently h
 separate profiling evidence and no equivalent performance gate. First HTTP audio
 is not first audible headset output. Qwen TTS was not tested.</p>
 </section>
+
+<section id="daisyrose-bf16-acceptance">
+<h2>DaisyRose BF16 serving acceptance</h2>
+<p>Use the <a href="https://huggingface.co/RadixArk/DaisyRose-27B/tree/64a4ec665091bb0c1931babce4e97e686eef3c5c">pinned DaisyRose checkpoint</a>
+and an empty run directory. Build the model and native session from the same CKE checkout.
+The exact BF16 projection provider requires an OpenMP oneDNN build and a host
+that supports its BF16 execution path. Point <code>CK_ONEDNN_LIBRARY</code> and
+<code>CK_ONEDNN_INCLUDE</code> at that build when compiling. For the selected
+MKL and SLEEF providers, set <code>CK_MKL_LIBRARY</code> and <code>CK_SLEEF_LIBRARY</code>
+to libraries exporting the required symbols.</p>
+<p>Set <code>CK_BUMP_FORCE_MIXED=1</code> when running the server and comparison
+on a host where two anonymous copies of the model would exceed available memory.
+This maps the model weights from the artifact and retains separate per-process
+activations.</p>
+<pre>make ck-session-v8
+python version/v8/scripts/ck_run_v8.py run &quot;$checkpoint&quot; --run &quot;$bundle&quot; \
+  --context-len 128 --serving-variant publisher --max-tokens 4 \
+  --temperature 0 --thinking-mode suppressed --prompt &#x27;Reply with exactly: hello&#x27;
+python version/v8/scripts/ck_serve_v8.py &quot;$bundle&quot; --no-build \
+  --host 127.0.0.1 --port 8391 --model-name daisyrose-27b-bf16</pre>
+<p>Run the acceptance in a second terminal with the same library environment.
+Declare the absolute and RMSE logit limits before running. The command writes
+full native and PyTorch logits, checkpoint and runtime identities, and separate
+HTTP and numerical verdicts to a new output directory.</p>
+<p>The oracle defaults to PyTorch math SDPA, which the BF16 circuit declares for full attention.
+Use <code>--oracle-attention eager</code> to compare a separate PyTorch attention implementation.
+The report records the selected arithmetic.</p>
+<pre>python -m server.daisyrose_bf16_acceptance --bundle &quot;$bundle&quot; \
+  --checkpoint &quot;$checkpoint&quot; --endpoint http://127.0.0.1:8391/v1 \
+  --session-library build/libck_session_v8.so --output-dir &quot;$evidence&quot; \
+  --max-abs &quot;$logit_max_abs&quot; --max-rmse &quot;$logit_max_rmse&quot;</pre>
+<p>For the optional asset-backed nightly row, set
+<code>CK_DAISYROSE_BF16_ACCEPTANCE</code> to a JSON file with the command option
+names as keys without leading dashes. The runner supplies the output directory.
+An unset variable reports SKIP.</p>
+</section>
