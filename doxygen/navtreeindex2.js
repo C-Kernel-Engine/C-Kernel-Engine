@@ -1,5 +1,6 @@
 var NAVTREEINDEX2 =
 {
+"audio__kernels_8c.html#adfa99d0523f008d9969a75cd60f31171":[2,0,1,1,29,26],
 "audio__kernels_8c.html#ae39d8ba6626b9af8dae0e07ba7e1e89c":[2,0,1,1,29,24],
 "audio__kernels_8c.html#ae40602291761aaeba8358d37f704c955":[2,0,1,1,29,15],
 "audio__kernels_8c.html#af4abdc08264eabcc7f8066c78d4e38a6":[2,0,1,1,29,36],
@@ -189,13 +190,16 @@ var NAVTREEINDEX2 =
 "backend__native_8c.html#a9008610196b2d6750454c58f87a6cc78":[2,0,1,9,1],
 "backend__native_8c_source.html":[2,0,1,9],
 "bf16__checked__tensor__ops_8c.html":[2,0,1,1,43],
+"bf16__checked__tensor__ops_8c.html#a30e623c8b4f829c088810049ff5fc14c":[2,0,1,1,43,5],
 "bf16__checked__tensor__ops_8c.html#a472f2a9fd5e6f3aca8ad4c9b5d3ba3bb":[2,0,1,1,43,1],
-"bf16__checked__tensor__ops_8c.html#a74e7d6d585dc8ace0e6650874db91880":[2,0,1,1,43,2],
-"bf16__checked__tensor__ops_8c.html#a769aeb442e3b75a0ae52660878d37572":[2,0,1,1,43,5],
+"bf16__checked__tensor__ops_8c.html#a769aeb442e3b75a0ae52660878d37572":[2,0,1,1,43,7],
 "bf16__checked__tensor__ops_8c.html#a84461965cd00d074d1125c8281623b00":[2,0,1,1,43,3],
+"bf16__checked__tensor__ops_8c.html#a89a37a5409386887648f4084eb6397c2":[2,0,1,1,43,2],
+"bf16__checked__tensor__ops_8c.html#ab351233604ad6c0ec1d23ae3bb04e1e4":[2,0,1,1,43,6],
+"bf16__checked__tensor__ops_8c.html#ab3ba1e6e837ed60d255bc42d58d9076a":[2,0,1,1,43,8],
 "bf16__checked__tensor__ops_8c.html#aec2f1df16f3e6584e7e0ac97a980b174":[2,0,1,1,43,4],
 "bf16__checked__tensor__ops_8c.html#af58c2800bcd33ea86e94f1f04af97029":[2,0,1,1,43,0],
-"bf16__checked__tensor__ops_8c.html#af868e5da55bbb9ac71862bcc959107a3":[2,0,1,1,43,6],
+"bf16__checked__tensor__ops_8c.html#af868e5da55bbb9ac71862bcc959107a3":[2,0,1,1,43,9],
 "bf16__checked__tensor__ops_8c_source.html":[2,0,1,1,43],
 "bf16__utils_8h.html":[2,0,0,2],
 "bf16__utils_8h.html#a027b5c4dd4c6ce7f656e922fc694e52a":[2,0,0,2,2],
@@ -245,9 +249,5 @@ var NAVTREEINDEX2 =
 "checked__guided__flow_8c.html#aae2ac844c0124d4e252a9604cc528cfa":[2,0,1,2,2,0],
 "checked__guided__flow_8c.html#ab19de8ef5c0eba4972c76c0193789bb9":[2,0,1,2,2,2],
 "checked__guided__flow_8c.html#abdb730ac2fcba2a235d9d18d6b766e21":[2,0,1,2,2,7],
-"checked__guided__flow_8c.html#ac5f70d2d3518286ac13b02e32fe43718":[2,0,1,2,2,5],
-"checked__guided__flow_8c.html#ad0ca7af6378bfbcaebb5c33dc2b4f0ab":[2,0,1,2,2,6],
-"checked__guided__flow_8c.html#ad5ef27250fe26e06eea130d8ce2247f6":[2,0,1,2,2,1],
-"checked__guided__flow_8c_source.html":[2,0,1,2,2],
-"checked__latent__loop_8c.html":[2,0,1,2,3]
+"checked__guided__flow_8c.html#ac5f70d2d3518286ac13b02e32fe43718":[2,0,1,2,2,5]
 };

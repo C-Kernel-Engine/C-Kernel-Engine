@@ -106,12 +106,13 @@ var NAVTREEINDEX1 =
 "attention__oracle__ggml_8h.html#a96dde4b4dc0e16ae5dd03bd3fd806975":[2,0,1,1,12,0],
 "attention__oracle__ggml_8h_source.html":[2,0,1,1,12],
 "attention__ranges__checked_8c.html":[2,0,1,1,13],
-"attention__ranges__checked_8c.html#a0f4ca4e6a1b4dbbfde85deb9da5dff2a":[2,0,1,1,13,3],
-"attention__ranges__checked_8c.html#a32a8497eb68a6b518f598eb9abdcb723":[2,0,1,1,13,1],
+"attention__ranges__checked_8c.html#a0f4ca4e6a1b4dbbfde85deb9da5dff2a":[2,0,1,1,13,4],
 "attention__ranges__checked_8c.html#a6093d1c4f57f29e5aa07ba35eae38c32":[2,0,1,1,13,2],
-"attention__ranges__checked_8c.html#a69d0b26f9824627188b7e836c870ac5f":[2,0,1,1,13,6],
-"attention__ranges__checked_8c.html#aa031ba3083f4f9fc437b6665050e62e3":[2,0,1,1,13,4],
-"attention__ranges__checked_8c.html#aa754cec1155df070fe8c56b837c0c5ec":[2,0,1,1,13,5],
+"attention__ranges__checked_8c.html#a69d0b26f9824627188b7e836c870ac5f":[2,0,1,1,13,7],
+"attention__ranges__checked_8c.html#aa031ba3083f4f9fc437b6665050e62e3":[2,0,1,1,13,5],
+"attention__ranges__checked_8c.html#aa754cec1155df070fe8c56b837c0c5ec":[2,0,1,1,13,6],
+"attention__ranges__checked_8c.html#abd73fac434c561bcd93642e7081d7e46":[2,0,1,1,13,1],
+"attention__ranges__checked_8c.html#ac4c3216aa58941e418b672a36ec92ead":[2,0,1,1,13,3],
 "attention__ranges__checked_8c.html#af265f627e095668f28f83547050887ca":[2,0,1,1,13,0],
 "attention__ranges__checked_8c_source.html":[2,0,1,1,13],
 "attention__rows__checked_8c.html":[2,0,1,1,14],
@@ -248,6 +249,5 @@ var NAVTREEINDEX1 =
 "audio__kernels_8c.html#ad2dea24c20761250c3df3b634ffabed4":[2,0,1,1,29,55],
 "audio__kernels_8c.html#ad7d987ef94d207f26bd869e78f80b5ed":[2,0,1,1,29,20],
 "audio__kernels_8c.html#ad899f5b1a0b235a700a22a316e284f2a":[2,0,1,1,29,45],
-"audio__kernels_8c.html#adf8b1ff9727b956bc11157aa96051a62":[2,0,1,1,29,5],
-"audio__kernels_8c.html#adfa99d0523f008d9969a75cd60f31171":[2,0,1,1,29,26]
+"audio__kernels_8c.html#adf8b1ff9727b956bc11157aa96051a62":[2,0,1,1,29,5]
 };

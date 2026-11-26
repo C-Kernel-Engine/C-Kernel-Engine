@@ -117,8 +117,9 @@ var searchData=
   ['ckernel_5ftoken_5fspan_5fmean_2eh_114',['ckernel_token_span_mean.h',['../ckernel__token__span__mean_8h.html',1,'']]],
   ['ckernel_5ftransformer_5frows_5fchecked_2eh_115',['ckernel_transformer_rows_checked.h',['../ckernel__transformer__rows__checked_8h.html',1,'']]],
   ['ckernel_5ftts_2eh_116',['ckernel_tts.h',['../ckernel__tts_8h.html',1,'']]],
-  ['concat_5fi32_5fchecked_2ec_117',['concat_i32_checked.c',['../concat__i32__checked_8c.html',1,'']]],
-  ['copy_5fi32_5fspan_5fchecked_2ec_118',['copy_i32_span_checked.c',['../copy__i32__span__checked_8c.html',1,'']]],
-  ['cpu_5ffeatures_2ec_119',['cpu_features.c',['../cpu__features_8c.html',1,'']]],
-  ['cpu_5ffeatures_2eh_120',['cpu_features.h',['../cpu__features_8h.html',1,'']]]
+  ['concat_5ffeatures_5fbf16_5fchecked_2ec_117',['concat_features_bf16_checked.c',['../concat__features__bf16__checked_8c.html',1,'']]],
+  ['concat_5fi32_5fchecked_2ec_118',['concat_i32_checked.c',['../concat__i32__checked_8c.html',1,'']]],
+  ['copy_5fi32_5fspan_5fchecked_2ec_119',['copy_i32_span_checked.c',['../copy__i32__span__checked_8c.html',1,'']]],
+  ['cpu_5ffeatures_2ec_120',['cpu_features.c',['../cpu__features_8c.html',1,'']]],
+  ['cpu_5ffeatures_2eh_121',['cpu_features.h',['../cpu__features_8h.html',1,'']]]
 ];

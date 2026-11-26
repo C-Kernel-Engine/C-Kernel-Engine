@@ -46,6 +46,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "bf16_checked_tensor_ops.c", "bf16__checked__tensor__ops_8c.html", "bf16__checked__tensor__ops_8c" ],
     [ "causal_depthwise_residual_checked.c", "causal__depthwise__residual__checked_8c.html", "causal__depthwise__residual__checked_8c" ],
     [ "checked_float_buffer.h", "checked__float__buffer_8h.html", "checked__float__buffer_8h" ],
+    [ "concat_features_bf16_checked.c", "concat__features__bf16__checked_8c.html", "concat__features__bf16__checked_8c" ],
     [ "concat_i32_checked.c", "concat__i32__checked_8c.html", "concat__i32__checked_8c" ],
     [ "copy_i32_span_checked.c", "copy__i32__span__checked_8c.html", "copy__i32__span__checked_8c" ],
     [ "decision_scoring_backward.c", "decision__scoring__backward_8c.html", "decision__scoring__backward_8c" ],
