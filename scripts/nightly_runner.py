@@ -692,6 +692,9 @@ TEST_SUITES = {
     "f32_gemm_row_reuse": TestSuite(
         "FP32 Production Row Reuse and Output Ownership", "kernels",
         ROOT / "tests" / "test_v8_f32_gemm_row_reuse.py"),
+    "q4k_tile_schedule": TestSuite(
+        "Packed Q4 Tile Scheduling", "kernels",
+        ROOT / "tests" / "test_q4k_llama_performance_gate.py", timeout_sec=120),
     "gemm_microkernel": TestSuite("GEMM Microkernel", "kernels", UNITTEST_DIR / "test_gemm_microkernel.py"),
     "add_bf16": TestSuite("BF16 Add Stored-Value Oracle", "kernels", UNITTEST_DIR / "test_add.py"),
     "gemm_fused": TestSuite("GEMM Fused", "kernels", UNITTEST_DIR / "test_gemm_fused.py"),
