@@ -330,7 +330,7 @@ $(function(){initNavTree('gelu__kernels_8c_source.html','',''); });
 <div class="line"><a id="l00186" name="l00186"></a><span class="lineno">  186</span>}</div>
 <div class="line"><a id="l00187" name="l00187"></a><span class="lineno">  187</span><span class="preprocessor">#endif</span></div>
 <div class="line"><a id="l00188" name="l00188"></a><span class="lineno">  188</span> </div>
-<div class="line"><a id="l00189" name="l00189"></a><span class="lineno">  189</span><span class="preprocessor">#if defined(__AVX2__)</span></div>
+<div class="line"><a id="l00189" name="l00189"></a><span class="lineno">  189</span><span class="preprocessor">#if defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
 <div class="line"><a id="l00190" name="l00190"></a><span class="lineno">  190</span><span class="keyword">static</span> <span class="keyword">inline</span> __m256 exp256_fast(__m256 x) {</div>
 <div class="line"><a id="l00191" name="l00191"></a><span class="lineno">  191</span>    x = _mm256_max_ps(x, _mm256_set1_ps(-88.0f));</div>
 <div class="line"><a id="l00192" name="l00192"></a><span class="lineno">  192</span>    x = _mm256_min_ps(x, _mm256_set1_ps(88.0f));</div>
@@ -422,7 +422,7 @@ $(function(){initNavTree('gelu__kernels_8c_source.html','',''); });
 <div class="line"><a id="l00277" name="l00277"></a><span class="lineno">  277</span>        data[i] = 0.5f * x * (1.0f + tanhf(inner));</div>
 <div class="line"><a id="l00278" name="l00278"></a><span class="lineno">  278</span>    }</div>
 <div class="line"><a id="l00279" name="l00279"></a><span class="lineno">  279</span> </div>
-<div class="line"><a id="l00280" name="l00280"></a><span class="lineno">  280</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><a id="l00280" name="l00280"></a><span class="lineno">  280</span><span class="preprocessor">#elif defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
 <div class="line"><a id="l00281" name="l00281"></a><span class="lineno">  281</span>    <span class="keyword">const</span> __m256 sqrt_2_pi_vec = _mm256_set1_ps(sqrt_2_over_pi);</div>
 <div class="line"><a id="l00282" name="l00282"></a><span class="lineno">  282</span>    <span class="keyword">const</span> __m256 coeff_vec = _mm256_set1_ps(coeff);</div>
 <div class="line"><a id="l00283" name="l00283"></a><span class="lineno">  283</span>    <span class="keyword">const</span> __m256 half_vec = _mm256_set1_ps(0.5f);</div>
@@ -570,7 +570,7 @@ $(function(){initNavTree('gelu__kernels_8c_source.html','',''); });
 <div class="line"><a id="l00423" name="l00423"></a><span class="lineno">  423</span>        d_input[i] = d_output[i] * gelu_derivative;</div>
 <div class="line"><a id="l00424" name="l00424"></a><span class="lineno">  424</span>    }</div>
 <div class="line"><a id="l00425" name="l00425"></a><span class="lineno">  425</span> </div>
-<div class="line"><a id="l00426" name="l00426"></a><span class="lineno">  426</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><a id="l00426" name="l00426"></a><span class="lineno">  426</span><span class="preprocessor">#elif defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
 <div class="line"><a id="l00427" name="l00427"></a><span class="lineno">  427</span>    <span class="keyword">const</span> __m256 sqrt_2_pi_vec = _mm256_set1_ps(sqrt_2_over_pi);</div>
 <div class="line"><a id="l00428" name="l00428"></a><span class="lineno">  428</span>    <span class="keyword">const</span> __m256 coeff_vec = _mm256_set1_ps(coeff);</div>
 <div class="line"><a id="l00429" name="l00429"></a><span class="lineno">  429</span>    <span class="keyword">const</span> __m256 coeff3_vec = _mm256_set1_ps(3.0f * coeff);</div>
@@ -1116,7 +1116,7 @@ $(function(){initNavTree('gelu__kernels_8c_source.html','',''); });
 <div class="line"><a id="l00941" name="l00941"></a><span class="lineno">  941</span>        d_input[i] = d_output[i] * gelu_derivative;</div>
 <div class="line"><a id="l00942" name="l00942"></a><span class="lineno">  942</span>    }</div>
 <div class="line"><a id="l00943" name="l00943"></a><span class="lineno">  943</span> </div>
-<div class="line"><a id="l00944" name="l00944"></a><span class="lineno">  944</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><a id="l00944" name="l00944"></a><span class="lineno">  944</span><span class="preprocessor">#elif defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
 <div class="line"><a id="l00945" name="l00945"></a><span class="lineno">  945</span>    <span class="keyword">const</span> __m256 beta_vec = _mm256_set1_ps(beta);</div>
 <div class="line"><a id="l00946" name="l00946"></a><span class="lineno">  946</span>    <span class="keyword">const</span> __m256 one_vec = _mm256_set1_ps(1.0f);</div>
 <div class="line"><a id="l00947" name="l00947"></a><span class="lineno">  947</span>    <span class="keyword">const</span> __m256 neg_beta_vec = _mm256_set1_ps(-beta);</div>

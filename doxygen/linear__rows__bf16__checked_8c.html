@@ -126,20 +126,232 @@ $(function(){initNavTree('linear__rows__bf16__checked_8c.html','',''); });
   <div class="headertitle"><div class="title">linear_rows_bf16_checked.c File Reference</div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><code>#include &lt;math.h&gt;</code><br />
+<div class="textblock"><code>#include &lt;dlfcn.h&gt;</code><br />
+<code>#include &lt;limits.h&gt;</code><br />
+<code>#include &lt;pthread.h&gt;</code><br />
+<code>#include &lt;stdlib.h&gt;</code><br />
+<code>#include &lt;string.h&gt;</code><br />
+<code>#include &lt;math.h&gt;</code><br />
 <code>#include &lt;stddef.h&gt;</code><br />
 <code>#include &lt;stdint.h&gt;</code><br />
 <code>#include &quot;<a class="el" href="bf16__utils_8h_source.html">bf16_utils.h</a>&quot;</code><br />
 </div>
 <p><a href="linear__rows__bf16__checked_8c_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-typedef-members" class="groupheader"><a id="typedef-members" name="typedef-members"></a>
+Typedefs</h2></td></tr>
+<tr class="memitem:a8aebbad2a07c3d101b7654080ba59327" id="r_a8aebbad2a07c3d101b7654080ba59327"><td class="memItemLeft" align="right" valign="top">typedef void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a8aebbad2a07c3d101b7654080ba59327">ck_dgemm_fn</a>) (const char *, const char *, const int *, const int *, const int *, const double *, const double *, const int *, const double *, const int *, const double *, double *, const int *)</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
+<tr class="memitem:a647dd98e86d260a01f620d31e2b046db" id="r_a647dd98e86d260a01f620d31e2b046db"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a647dd98e86d260a01f620d31e2b046db">bind_dgemm</a> (void)</td></tr>
+<tr class="memitem:a7c7946f7f5bc18d3e9d9d643edcd7e20" id="r_a7c7946f7f5bc18d3e9d9d643edcd7e20"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a7c7946f7f5bc18d3e9d9d643edcd7e20">ck_linear_rows_bf16_blas_checked</a> (const uint16_t *input, size_t input_elements, const uint16_t *weight, size_t weight_elements, uint16_t *output, size_t output_elements, uint16_t *staged, size_t staged_elements, double *work, size_t work_elements, size_t rows, size_t input_width, size_t output_width)</td></tr>
 <tr class="memitem:aa859d5718cd35edd7b2c60811f7391dc" id="r_aa859d5718cd35edd7b2c60811f7391dc"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa859d5718cd35edd7b2c60811f7391dc">ck_linear_rows_bf16_checked</a> (const uint16_t *input, size_t input_elements, const uint16_t *weight, size_t weight_elements, uint16_t *output, size_t output_elements, uint16_t *staged, size_t staged_elements, size_t rows, size_t input_width, size_t output_width)</td></tr>
 <tr class="memitem:af311e64dbc818b2c91892b45b67811e0" id="r_af311e64dbc818b2c91892b45b67811e0"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a> (const uint16_t *a, size_t a_count, const uint16_t *b, size_t b_count)</td></tr>
 <tr class="memitem:a78df73c6b24df1165dea5b09d8cfa403" id="r_a78df73c6b24df1165dea5b09d8cfa403"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a> (const uint16_t *ptr, size_t elements)</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 id="header-var-members" class="groupheader"><a id="var-members" name="var-members"></a>
+Variables</h2></td></tr>
+<tr class="memitem:a81865677423286fcc5181786b4fe522a" id="r_a81865677423286fcc5181786b4fe522a"><td class="memItemLeft" align="right" valign="top">static <a class="el" href="#a8aebbad2a07c3d101b7654080ba59327">ck_dgemm_fn</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a81865677423286fcc5181786b4fe522a">dgemm</a></td></tr>
+<tr class="memitem:a00aefcf081d3e38d522718b9c90cf285" id="r_a00aefcf081d3e38d522718b9c90cf285"><td class="memItemLeft" align="right" valign="top">static pthread_once_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a00aefcf081d3e38d522718b9c90cf285">dgemm_once</a> = PTHREAD_ONCE_INIT</td></tr>
 </table>
+<a name="doc-typedef-members" id="doc-typedef-members"></a><h2 id="header-doc-typedef-members" class="groupheader">Typedef Documentation</h2>
+<a id="a8aebbad2a07c3d101b7654080ba59327" name="a8aebbad2a07c3d101b7654080ba59327"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a8aebbad2a07c3d101b7654080ba59327">&#9670;&#160;</a></span>ck_dgemm_fn</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">typedef void(* ck_dgemm_fn) (const char *, const char *, const int *, const int *, const int *, const double *, const double *, const int *, const double *, const int *, const double *, double *, const int *)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00073">73</a> of file <a class="el" href="linear__rows__bf16__checked_8c_source.html">linear_rows_bf16_checked.c</a>.</p>
+
+</div>
+</div>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
+<a id="a647dd98e86d260a01f620d31e2b046db" name="a647dd98e86d260a01f620d31e2b046db"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a647dd98e86d260a01f620d31e2b046db">&#9670;&#160;</a></span>bind_dgemm()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void bind_dgemm </td>
+          <td>(</td>
+          <td class="paramtype">void</td>          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00080">80</a> of file <a class="el" href="linear__rows__bf16__checked_8c_source.html">linear_rows_bf16_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   81</span>{</div>
+<div class="line"><span class="lineno">   82</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> *path = getenv(<span class="stringliteral">&quot;CK_BLAS_LIBRARY&quot;</span>);</div>
+<div class="line"><span class="lineno">   83</span>    <span class="keywordtype">void</span> *library = path &amp;&amp; *path ? dlopen(path, RTLD_NOW | RTLD_LOCAL) : <a class="code hl_define" href="attention__kernels_8c.html#a58d13c5dcabbb85848fa97b446086247">RTLD_DEFAULT</a>;</div>
+<div class="line"><span class="lineno">   84</span>    <span class="keywordflow">if</span> (path &amp;&amp; *path &amp;&amp; !library)</div>
+<div class="line"><span class="lineno">   85</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   86</span>    <span class="keywordtype">void</span> *symbol = dlsym(library, <span class="stringliteral">&quot;dgemm_&quot;</span>);</div>
+<div class="line"><span class="lineno">   87</span>    <span class="keyword">_Static_assert</span>(<span class="keyword">sizeof</span>(symbol) == <span class="keyword">sizeof</span>(<a class="code hl_variable" href="#a81865677423286fcc5181786b4fe522a">dgemm</a>), <span class="stringliteral">&quot;dgemm_ function pointer size&quot;</span>);</div>
+<div class="line"><span class="lineno">   88</span>    memcpy(&amp;<a class="code hl_variable" href="#a81865677423286fcc5181786b4fe522a">dgemm</a>, &amp;symbol, <span class="keyword">sizeof</span>(<a class="code hl_variable" href="#a81865677423286fcc5181786b4fe522a">dgemm</a>));</div>
+<div class="line"><span class="lineno">   89</span>}</div>
+<div class="ttc" id="aattention__kernels_8c_html_a58d13c5dcabbb85848fa97b446086247"><div class="ttname"><a href="attention__kernels_8c.html#a58d13c5dcabbb85848fa97b446086247">RTLD_DEFAULT</a></div><div class="ttdeci">#define RTLD_DEFAULT</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l00032">attention_kernels.c:32</a></div></div>
+<div class="ttc" id="alinear__rows__bf16__checked_8c_html_a81865677423286fcc5181786b4fe522a"><div class="ttname"><a href="#a81865677423286fcc5181786b4fe522a">dgemm</a></div><div class="ttdeci">static ck_dgemm_fn dgemm</div><div class="ttdef"><b>Definition</b> <a href="linear__rows__bf16__checked_8c_source.html#l00078">linear_rows_bf16_checked.c:78</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00078">dgemm</a>, and <a class="el" href="attention__kernels_8c_source.html#l00032">RTLD_DEFAULT</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00091">ck_linear_rows_bf16_blas_checked()</a>.</p>
+
+</div>
+</div>
+<a id="a7c7946f7f5bc18d3e9d9d643edcd7e20" name="a7c7946f7f5bc18d3e9d9d643edcd7e20"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7c7946f7f5bc18d3e9d9d643edcd7e20">&#9670;&#160;</a></span>ck_linear_rows_bf16_blas_checked()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_linear_rows_bf16_blas_checked </td>
+          <td>(</td>
+          <td class="paramtype">const uint16_t *</td>          <td class="paramname"><span class="paramname"><em>input</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>input_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const uint16_t *</td>          <td class="paramname"><span class="paramname"><em>weight</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>weight_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint16_t *</td>          <td class="paramname"><span class="paramname"><em>output</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>output_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint16_t *</td>          <td class="paramname"><span class="paramname"><em>staged</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>staged_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">double *</td>          <td class="paramname"><span class="paramname"><em>work</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>work_elements</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>rows</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>input_width</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>output_width</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00091">91</a> of file <a class="el" href="linear__rows__bf16__checked_8c_source.html">linear_rows_bf16_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   95</span>{</div>
+<div class="line"><span class="lineno">   96</span>    <span class="keywordflow">if</span> (!rows || !input_width || !output_width || rows &gt; INT_MAX ||</div>
+<div class="line"><span class="lineno">   97</span>        input_width &gt; INT_MAX || output_width &gt; INT_MAX ||</div>
+<div class="line"><span class="lineno">   98</span>        rows &gt; SIZE_MAX / input_width || output_width &gt; SIZE_MAX / input_width ||</div>
+<div class="line"><span class="lineno">   99</span>        rows &gt; SIZE_MAX / output_width)</div>
+<div class="line"><span class="lineno">  100</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  101</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> a = rows * input_width, b = output_width * input_width, c = rows * output_width;</div>
+<div class="line"><span class="lineno">  102</span>    <span class="keywordflow">if</span> (a &gt; SIZE_MAX - b || a + b &gt; SIZE_MAX - c)</div>
+<div class="line"><span class="lineno">  103</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  104</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> work_count = a + b + c;</div>
+<div class="line"><span class="lineno">  105</span>    <span class="keywordflow">if</span> (a &gt; input_elements || b &gt; weight_elements || c &gt; output_elements ||</div>
+<div class="line"><span class="lineno">  106</span>        c &gt; staged_elements || work_count &gt; work_elements || !work ||</div>
+<div class="line"><span class="lineno">  107</span>        (uintptr_t)work % _Alignof(<span class="keywordtype">double</span>) || work_count &gt; SIZE_MAX / <span class="keyword">sizeof</span>(<span class="keywordtype">double</span>))</div>
+<div class="line"><span class="lineno">  108</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  109</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> work_bits = work_count * (<span class="keyword">sizeof</span>(double) / <span class="keyword">sizeof</span>(uint16_t));</div>
+<div class="line"><span class="lineno">  110</span>    <span class="keyword">const</span> uint16_t *work_region = (<span class="keyword">const</span> uint16_t*)work;</div>
+<div class="line"><span class="lineno">  111</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a>(input, a) || !<a class="code hl_function" href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a>(weight, b) ||</div>
+<div class="line"><span class="lineno">  112</span>        !<a class="code hl_function" href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a>(output, c) || !<a class="code hl_function" href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a>(staged, c) ||</div>
+<div class="line"><span class="lineno">  113</span>        !<a class="code hl_function" href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a>(work_region, work_bits) ||</div>
+<div class="line"><span class="lineno">  114</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(output, c, input, a) || <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(output, c, weight, b) ||</div>
+<div class="line"><span class="lineno">  115</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(staged, c, input, a) || <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(staged, c, weight, b) ||</div>
+<div class="line"><span class="lineno">  116</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(output, c, staged, c) ||</div>
+<div class="line"><span class="lineno">  117</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(work_region, work_bits, input, a) || <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(work_region, work_bits, weight, b) ||</div>
+<div class="line"><span class="lineno">  118</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(work_region, work_bits, staged, c) || <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(work_region, work_bits, output, c))</div>
+<div class="line"><span class="lineno">  119</span>        <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">  120</span>    pthread_once(&amp;<a class="code hl_variable" href="#a00aefcf081d3e38d522718b9c90cf285">dgemm_once</a>, <a class="code hl_function" href="#a647dd98e86d260a01f620d31e2b046db">bind_dgemm</a>);</div>
+<div class="line"><span class="lineno">  121</span>    <span class="keywordflow">if</span> (!<a class="code hl_variable" href="#a81865677423286fcc5181786b4fe522a">dgemm</a>)</div>
+<div class="line"><span class="lineno">  122</span>        <span class="keywordflow">return</span> -4;</div>
+<div class="line"><span class="lineno">  123</span>    <span class="keywordtype">double</span> *matrix_a = work, *matrix_b = work + a, *matrix_c = work + a + b;</div>
+<div class="line"><span class="lineno">  124</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; a; ++i) {</div>
+<div class="line"><span class="lineno">  125</span>        matrix_a[i] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(input[i]);</div>
+<div class="line"><span class="lineno">  126</span>        <span class="keywordflow">if</span> (!isfinite(matrix_a[i]))</div>
+<div class="line"><span class="lineno">  127</span>            <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  128</span>    }</div>
+<div class="line"><span class="lineno">  129</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; b; ++i) {</div>
+<div class="line"><span class="lineno">  130</span>        matrix_b[i] = <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(weight[i]);</div>
+<div class="line"><span class="lineno">  131</span>        <span class="keywordflow">if</span> (!isfinite(matrix_b[i]))</div>
+<div class="line"><span class="lineno">  132</span>            <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  133</span>    }</div>
+<div class="line"><span class="lineno">  134</span>    <span class="keyword">const</span> <span class="keywordtype">char</span> trans = <span class="charliteral">&#39;T&#39;</span>, no_trans = <span class="charliteral">&#39;N&#39;</span>;</div>
+<div class="line"><span class="lineno">  135</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> m = (int)rows, n = (<span class="keywordtype">int</span>)output_width, k = (int)input_width;</div>
+<div class="line"><span class="lineno">  136</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> one = 1.0, zero = 0.0;</div>
+<div class="line"><span class="lineno">  137</span>    <a class="code hl_variable" href="#a81865677423286fcc5181786b4fe522a">dgemm</a>(&amp;trans, &amp;no_trans, &amp;n, &amp;m, &amp;k, &amp;one, matrix_b, &amp;k, matrix_a, &amp;k, &amp;zero, matrix_c, &amp;n);</div>
+<div class="line"><span class="lineno">  138</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; c; ++i) {</div>
+<div class="line"><span class="lineno">  139</span>        staged[i] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>((<span class="keywordtype">float</span>)matrix_c[i]);</div>
+<div class="line"><span class="lineno">  140</span>        <span class="keywordflow">if</span> (!isfinite(<a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(staged[i])))</div>
+<div class="line"><span class="lineno">  141</span>            <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  142</span>    }</div>
+<div class="line"><span class="lineno">  143</span>    memcpy(output, staged, c * <span class="keyword">sizeof</span>(*output));</div>
+<div class="line"><span class="lineno">  144</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  145</span>}</div>
+<div class="ttc" id="abf16__utils_8h_html_a174b16a92b3a5972230d7519fc0c5aa3"><div class="ttname"><a href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a></div><div class="ttdeci">static uint16_t float_to_bf16(float f)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00090">bf16_utils.h:90</a></div></div>
+<div class="ttc" id="abf16__utils_8h_html_a314c3970fd5e2770d19b1bb49aefcf94"><div class="ttname"><a href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a></div><div class="ttdeci">static float bf16_to_float(uint16_t v)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00038">bf16_utils.h:38</a></div></div>
+<div class="ttc" id="alinear__rows__bf16__checked_8c_html_a00aefcf081d3e38d522718b9c90cf285"><div class="ttname"><a href="#a00aefcf081d3e38d522718b9c90cf285">dgemm_once</a></div><div class="ttdeci">static pthread_once_t dgemm_once</div><div class="ttdef"><b>Definition</b> <a href="linear__rows__bf16__checked_8c_source.html#l00077">linear_rows_bf16_checked.c:77</a></div></div>
+<div class="ttc" id="alinear__rows__bf16__checked_8c_html_a647dd98e86d260a01f620d31e2b046db"><div class="ttname"><a href="#a647dd98e86d260a01f620d31e2b046db">bind_dgemm</a></div><div class="ttdeci">static void bind_dgemm(void)</div><div class="ttdef"><b>Definition</b> <a href="linear__rows__bf16__checked_8c_source.html#l00080">linear_rows_bf16_checked.c:80</a></div></div>
+<div class="ttc" id="alinear__rows__bf16__checked_8c_html_a78df73c6b24df1165dea5b09d8cfa403"><div class="ttname"><a href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a></div><div class="ttdeci">static int region_valid(const uint16_t *ptr, size_t elements)</div><div class="ttdef"><b>Definition</b> <a href="linear__rows__bf16__checked_8c_source.html#l00012">linear_rows_bf16_checked.c:12</a></div></div>
+<div class="ttc" id="alinear__rows__bf16__checked_8c_html_af311e64dbc818b2c91892b45b67811e0"><div class="ttname"><a href="#af311e64dbc818b2c91892b45b67811e0">overlap</a></div><div class="ttdeci">static int overlap(const uint16_t *a, size_t a_count, const uint16_t *b, size_t b_count)</div><div class="ttdef"><b>Definition</b> <a href="linear__rows__bf16__checked_8c_source.html#l00019">linear_rows_bf16_checked.c:19</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00080">bind_dgemm()</a>, <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00078">dgemm</a>, <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00077">dgemm_once</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00019">overlap()</a>, and <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00012">region_valid()</a>.</p>
+
+</div>
+</div>
 <a id="aa859d5718cd35edd7b2c60811f7391dc" name="aa859d5718cd35edd7b2c60811f7391dc"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aa859d5718cd35edd7b2c60811f7391dc">&#9670;&#160;</a></span>ck_linear_rows_bf16_checked()</h2>
 
@@ -204,52 +416,48 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00023">23</a> of file <a class="el" href="linear__rows__bf16__checked_8c_source.html">linear_rows_bf16_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   29</span>{</div>
-<div class="line"><span class="lineno">   30</span>    <span class="keywordflow">if</span> (!rows || !input_width || !output_width ||</div>
-<div class="line"><span class="lineno">   31</span>        rows &gt; SIZE_MAX / input_width || output_width &gt; SIZE_MAX / input_width ||</div>
-<div class="line"><span class="lineno">   32</span>        rows &gt; SIZE_MAX / output_width) <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">   33</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> in_count = rows * input_width;</div>
-<div class="line"><span class="lineno">   34</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> w_count = output_width * input_width;</div>
-<div class="line"><span class="lineno">   35</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> out_count = rows * output_width;</div>
-<div class="line"><span class="lineno">   36</span>    <span class="keywordflow">if</span> (input_elements &lt; in_count || weight_elements &lt; w_count ||</div>
-<div class="line"><span class="lineno">   37</span>        output_elements &lt; out_count || staged_elements &lt; out_count) <span class="keywordflow">return</span> -2;</div>
-<div class="line"><span class="lineno">   38</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a>(input, input_elements) || !<a class="code hl_function" href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a>(weight, weight_elements) ||</div>
-<div class="line"><span class="lineno">   39</span>        !<a class="code hl_function" href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a>(output, output_elements) || !<a class="code hl_function" href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a>(staged, staged_elements) ||</div>
-<div class="line"><span class="lineno">   40</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(output, output_elements, input, input_elements) ||</div>
-<div class="line"><span class="lineno">   41</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(output, output_elements, weight, weight_elements) ||</div>
-<div class="line"><span class="lineno">   42</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(output, output_elements, staged, staged_elements) ||</div>
-<div class="line"><span class="lineno">   43</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(staged, staged_elements, input, input_elements) ||</div>
-<div class="line"><span class="lineno">   44</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(staged, staged_elements, weight, weight_elements)) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   45</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; in_count; ++i)</div>
-<div class="line"><span class="lineno">   46</span>        <span class="keywordflow">if</span> (!isfinite(<a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(input[i]))) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   47</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; w_count; ++i)</div>
-<div class="line"><span class="lineno">   48</span>        <span class="keywordflow">if</span> (!isfinite(<a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(weight[i]))) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   49</span> </div>
-<div class="line"><span class="lineno">   50</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r) {</div>
-<div class="line"><span class="lineno">   51</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_width; ++o) {</div>
-<div class="line"><span class="lineno">   52</span>            <span class="keyword">const</span> uint16_t *src = input + r * input_width;</div>
-<div class="line"><span class="lineno">   53</span>            <span class="keyword">const</span> uint16_t *w = weight + o * input_width;</div>
-<div class="line"><span class="lineno">   54</span>            <span class="keywordtype">double</span> sum = 0.0;</div>
-<div class="line"><span class="lineno">   55</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; input_width; ++k) {</div>
-<div class="line"><span class="lineno">   56</span>                <span class="keyword">volatile</span> <span class="keywordtype">double</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = (double)<a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(src[k]) * <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(w[k]);</div>
-<div class="line"><span class="lineno">   57</span>                sum += <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
-<div class="line"><span class="lineno">   58</span>            }</div>
-<div class="line"><span class="lineno">   59</span>            <span class="keyword">const</span> uint16_t b = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>((<span class="keywordtype">float</span>)sum);</div>
-<div class="line"><span class="lineno">   60</span>            <span class="keywordflow">if</span> (!isfinite(<a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(b))) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   61</span>            staged[r * output_width + o] = b;</div>
-<div class="line"><span class="lineno">   62</span>        }</div>
-<div class="line"><span class="lineno">   63</span>    }</div>
-<div class="line"><span class="lineno">   64</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; out_count; ++i) output[i] = staged[i];</div>
-<div class="line"><span class="lineno">   65</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">   66</span>}</div>
+<p class="definition">Definition at line <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00028">28</a> of file <a class="el" href="linear__rows__bf16__checked_8c_source.html">linear_rows_bf16_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   34</span>{</div>
+<div class="line"><span class="lineno">   35</span>    <span class="keywordflow">if</span> (!rows || !input_width || !output_width ||</div>
+<div class="line"><span class="lineno">   36</span>        rows &gt; SIZE_MAX / input_width || output_width &gt; SIZE_MAX / input_width ||</div>
+<div class="line"><span class="lineno">   37</span>        rows &gt; SIZE_MAX / output_width) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">   38</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> in_count = rows * input_width;</div>
+<div class="line"><span class="lineno">   39</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> w_count = output_width * input_width;</div>
+<div class="line"><span class="lineno">   40</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> out_count = rows * output_width;</div>
+<div class="line"><span class="lineno">   41</span>    <span class="keywordflow">if</span> (input_elements &lt; in_count || weight_elements &lt; w_count ||</div>
+<div class="line"><span class="lineno">   42</span>        output_elements &lt; out_count || staged_elements &lt; out_count) <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">   43</span>    <span class="keywordflow">if</span> (!<a class="code hl_function" href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a>(input, input_elements) || !<a class="code hl_function" href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a>(weight, weight_elements) ||</div>
+<div class="line"><span class="lineno">   44</span>        !<a class="code hl_function" href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a>(output, output_elements) || !<a class="code hl_function" href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a>(staged, staged_elements) ||</div>
+<div class="line"><span class="lineno">   45</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(output, output_elements, input, input_elements) ||</div>
+<div class="line"><span class="lineno">   46</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(output, output_elements, weight, weight_elements) ||</div>
+<div class="line"><span class="lineno">   47</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(output, output_elements, staged, staged_elements) ||</div>
+<div class="line"><span class="lineno">   48</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(staged, staged_elements, input, input_elements) ||</div>
+<div class="line"><span class="lineno">   49</span>        <a class="code hl_function" href="#af311e64dbc818b2c91892b45b67811e0">overlap</a>(staged, staged_elements, weight, weight_elements)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   50</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; in_count; ++i)</div>
+<div class="line"><span class="lineno">   51</span>        <span class="keywordflow">if</span> (!isfinite(<a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(input[i]))) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   52</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; w_count; ++i)</div>
+<div class="line"><span class="lineno">   53</span>        <span class="keywordflow">if</span> (!isfinite(<a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(weight[i]))) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   54</span> </div>
+<div class="line"><span class="lineno">   55</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> r = 0; r &lt; rows; ++r) {</div>
+<div class="line"><span class="lineno">   56</span>        <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> o = 0; o &lt; output_width; ++o) {</div>
+<div class="line"><span class="lineno">   57</span>            <span class="keyword">const</span> uint16_t *src = input + r * input_width;</div>
+<div class="line"><span class="lineno">   58</span>            <span class="keyword">const</span> uint16_t *w = weight + o * input_width;</div>
+<div class="line"><span class="lineno">   59</span>            <span class="keywordtype">double</span> sum = 0.0;</div>
+<div class="line"><span class="lineno">   60</span>            <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> k = 0; k &lt; input_width; ++k) {</div>
+<div class="line"><span class="lineno">   61</span>                <span class="keyword">volatile</span> <span class="keywordtype">double</span> <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a> = (double)<a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(src[k]) * <a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(w[k]);</div>
+<div class="line"><span class="lineno">   62</span>                sum += <a class="code hl_function" href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a>;</div>
+<div class="line"><span class="lineno">   63</span>            }</div>
+<div class="line"><span class="lineno">   64</span>            <span class="keyword">const</span> uint16_t b = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>((<span class="keywordtype">float</span>)sum);</div>
+<div class="line"><span class="lineno">   65</span>            <span class="keywordflow">if</span> (!isfinite(<a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(b))) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   66</span>            staged[r * output_width + o] = b;</div>
+<div class="line"><span class="lineno">   67</span>        }</div>
+<div class="line"><span class="lineno">   68</span>    }</div>
+<div class="line"><span class="lineno">   69</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; out_count; ++i) output[i] = staged[i];</div>
+<div class="line"><span class="lineno">   70</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">   71</span>}</div>
 <div class="ttc" id="aaudio__spectral__head_8c_html_a6cbb018b1e755f86de9d2dd05d164a53"><div class="ttname"><a href="audio__spectral__head_8c.html#a6cbb018b1e755f86de9d2dd05d164a53">product</a></div><div class="ttdeci">static int product(size_t a, size_t b, size_t *out)</div><div class="ttdef"><b>Definition</b> <a href="audio__spectral__head_8c_source.html#l00006">audio_spectral_head.c:6</a></div></div>
-<div class="ttc" id="abf16__utils_8h_html_a174b16a92b3a5972230d7519fc0c5aa3"><div class="ttname"><a href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a></div><div class="ttdeci">static uint16_t float_to_bf16(float f)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00090">bf16_utils.h:90</a></div></div>
-<div class="ttc" id="abf16__utils_8h_html_a314c3970fd5e2770d19b1bb49aefcf94"><div class="ttname"><a href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a></div><div class="ttdeci">static float bf16_to_float(uint16_t v)</div><div class="ttdef"><b>Definition</b> <a href="bf16__utils_8h_source.html#l00038">bf16_utils.h:38</a></div></div>
-<div class="ttc" id="alinear__rows__bf16__checked_8c_html_a78df73c6b24df1165dea5b09d8cfa403"><div class="ttname"><a href="#a78df73c6b24df1165dea5b09d8cfa403">region_valid</a></div><div class="ttdeci">static int region_valid(const uint16_t *ptr, size_t elements)</div><div class="ttdef"><b>Definition</b> <a href="linear__rows__bf16__checked_8c_source.html#l00007">linear_rows_bf16_checked.c:7</a></div></div>
-<div class="ttc" id="alinear__rows__bf16__checked_8c_html_af311e64dbc818b2c91892b45b67811e0"><div class="ttname"><a href="#af311e64dbc818b2c91892b45b67811e0">overlap</a></div><div class="ttdeci">static int overlap(const uint16_t *a, size_t a_count, const uint16_t *b, size_t b_count)</div><div class="ttdef"><b>Definition</b> <a href="linear__rows__bf16__checked_8c_source.html#l00014">linear_rows_bf16_checked.c:14</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00014">overlap()</a>, <a class="el" href="audio__spectral__head_8c_source.html#l00006">product()</a>, and <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00007">region_valid()</a>.</p>
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00019">overlap()</a>, <a class="el" href="audio__spectral__head_8c_source.html#l00006">product()</a>, and <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00012">region_valid()</a>.</p>
 
 </div>
 </div>
@@ -290,13 +498,13 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00014">14</a> of file <a class="el" href="linear__rows__bf16__checked_8c_source.html">linear_rows_bf16_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   16</span>{</div>
-<div class="line"><span class="lineno">   17</span>    <span class="keywordflow">return</span> (uintptr_t)a &lt; (uintptr_t)b + b_count * <span class="keyword">sizeof</span>(uint16_t) &amp;&amp;</div>
-<div class="line"><span class="lineno">   18</span>           (uintptr_t)b &lt; (uintptr_t)a + a_count * <span class="keyword">sizeof</span>(uint16_t);</div>
-<div class="line"><span class="lineno">   19</span>}</div>
+<p class="definition">Definition at line <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00019">19</a> of file <a class="el" href="linear__rows__bf16__checked_8c_source.html">linear_rows_bf16_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   21</span>{</div>
+<div class="line"><span class="lineno">   22</span>    <span class="keywordflow">return</span> (uintptr_t)a &lt; (uintptr_t)b + b_count * <span class="keyword">sizeof</span>(uint16_t) &amp;&amp;</div>
+<div class="line"><span class="lineno">   23</span>           (uintptr_t)b &lt; (uintptr_t)a + a_count * <span class="keyword">sizeof</span>(uint16_t);</div>
+<div class="line"><span class="lineno">   24</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00023">ck_linear_rows_bf16_checked()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00091">ck_linear_rows_bf16_blas_checked()</a>, and <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00028">ck_linear_rows_bf16_checked()</a>.</p>
 
 </div>
 </div>
@@ -327,14 +535,67 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00007">7</a> of file <a class="el" href="linear__rows__bf16__checked_8c_source.html">linear_rows_bf16_checked.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">    8</span>{</div>
-<div class="line"><span class="lineno">    9</span>    <span class="keywordflow">return</span> ptr &amp;&amp; (uintptr_t)ptr % _Alignof(uint16_t) == 0 &amp;&amp;</div>
-<div class="line"><span class="lineno">   10</span>           elements &lt;= SIZE_MAX / <span class="keyword">sizeof</span>(uint16_t) &amp;&amp;</div>
-<div class="line"><span class="lineno">   11</span>           (uintptr_t)ptr &lt;= UINTPTR_MAX - elements * <span class="keyword">sizeof</span>(uint16_t);</div>
-<div class="line"><span class="lineno">   12</span>}</div>
+<p class="definition">Definition at line <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00012">12</a> of file <a class="el" href="linear__rows__bf16__checked_8c_source.html">linear_rows_bf16_checked.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   13</span>{</div>
+<div class="line"><span class="lineno">   14</span>    <span class="keywordflow">return</span> ptr &amp;&amp; (uintptr_t)ptr % _Alignof(uint16_t) == 0 &amp;&amp;</div>
+<div class="line"><span class="lineno">   15</span>           elements &lt;= SIZE_MAX / <span class="keyword">sizeof</span>(uint16_t) &amp;&amp;</div>
+<div class="line"><span class="lineno">   16</span>           (uintptr_t)ptr &lt;= UINTPTR_MAX - elements * <span class="keyword">sizeof</span>(uint16_t);</div>
+<div class="line"><span class="lineno">   17</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00023">ck_linear_rows_bf16_checked()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00091">ck_linear_rows_bf16_blas_checked()</a>, and <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00028">ck_linear_rows_bf16_checked()</a>.</p>
+
+</div>
+</div>
+<a name="doc-var-members" id="doc-var-members"></a><h2 id="header-doc-var-members" class="groupheader">Variable Documentation</h2>
+<a id="a81865677423286fcc5181786b4fe522a" name="a81865677423286fcc5181786b4fe522a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a81865677423286fcc5181786b4fe522a">&#9670;&#160;</a></span>dgemm</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="#a8aebbad2a07c3d101b7654080ba59327">ck_dgemm_fn</a> dgemm</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00078">78</a> of file <a class="el" href="linear__rows__bf16__checked_8c_source.html">linear_rows_bf16_checked.c</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00080">bind_dgemm()</a>, and <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00091">ck_linear_rows_bf16_blas_checked()</a>.</p>
+
+</div>
+</div>
+<a id="a00aefcf081d3e38d522718b9c90cf285" name="a00aefcf081d3e38d522718b9c90cf285"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a00aefcf081d3e38d522718b9c90cf285">&#9670;&#160;</a></span>dgemm_once</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">pthread_once_t dgemm_once = PTHREAD_ONCE_INIT</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00077">77</a> of file <a class="el" href="linear__rows__bf16__checked_8c_source.html">linear_rows_bf16_checked.c</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="linear__rows__bf16__checked_8c_source.html#l00091">ck_linear_rows_bf16_blas_checked()</a>.</p>
 
 </div>
 </div>

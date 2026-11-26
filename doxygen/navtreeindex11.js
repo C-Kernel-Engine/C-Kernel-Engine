@@ -1,5 +1,14 @@
 var NAVTREEINDEX11 =
 {
+"ckernel__kernel__specs_8c.html#a61dc38fb3d0ea5eaf6ee3fea5ad9c26a":[2,0,1,21,21],
+"ckernel__kernel__specs_8c.html#a6865300e2e7c079c01244462fbd9eb5b":[2,0,1,21,22],
+"ckernel__kernel__specs_8c.html#a6d7571c2e5efb892237a0065ed5c9262":[2,0,1,21,8],
+"ckernel__kernel__specs_8c.html#a78253557cd8c8795464f1988cd7c23a5":[2,0,1,21,14],
+"ckernel__kernel__specs_8c.html#a7a9c77e5546eacfb8d032bdf66a85a74":[2,0,1,21,23],
+"ckernel__kernel__specs_8c.html#a7b169d0eafc6b23adf4dc42551b8a38e":[2,0,1,21,29],
+"ckernel__kernel__specs_8c.html#a7fa14f40e9875b558f212568286d093b":[2,0,1,21,6],
+"ckernel__kernel__specs_8c.html#a96b6d10882bf34a6c7b9bf07b9b31fa2":[2,0,1,21,11],
+"ckernel__kernel__specs_8c.html#a98a362c88dfcef36d1a89b2f15c897ed":[2,0,1,21,19],
 "ckernel__kernel__specs_8c.html#aa16d7f74434cfa05e7ce4d637b52b922":[2,0,1,21,20],
 "ckernel__kernel__specs_8c.html#aa20bb688c0d74340b5300e106e14e72a":[2,0,1,21,33],
 "ckernel__kernel__specs_8c.html#aa8a0174240769286802a66c7e4baec38":[2,0,1,21,9],
@@ -240,14 +249,5 @@ var NAVTREEINDEX11 =
 "ckernel__quant_8h.html#ac0c2d914efc428c1bcc6fc88eaf07d23":[2,0,0,58,42],
 "ckernel__quant_8h.html#ac14fcad36b93665d0bc01dfca3d9e6d9":[2,0,0,58,30],
 "ckernel__quant_8h.html#ad7fa7d735b58b52c90cbd6160676e86f":[2,0,0,58,52],
-"ckernel__quant_8h.html#ad8834a1bb3edfa7fb47a2e47ab9e189a":[2,0,0,58,36],
-"ckernel__quant_8h.html#adc037213865781c5c1ea63708ef94307":[2,0,0,58,54],
-"ckernel__quant_8h.html#adf8ea140a408f51698d95718f1d8db49":[2,0,0,58,51],
-"ckernel__quant_8h.html#ae33428ceaccaaf2ceeeb52f77401b382":[2,0,0,58,37],
-"ckernel__quant_8h.html#aea5f7a52ed3f21e0c6795766cfb28751":[2,0,0,58,58],
-"ckernel__quant_8h.html#aecceb26c16a9b7d47c437c4cbfb8d869":[2,0,0,58,35],
-"ckernel__quant_8h.html#aedc9eb1ae7fe9c543d0aa2d8860c5255":[2,0,0,58,55],
-"ckernel__quant_8h.html#af13e8b7fd92d0f48c1cfca7161552d4a":[2,0,0,58,24],
-"ckernel__quant_8h.html#af3f29c11bc7575b8d3c3d88433875d3b":[2,0,0,58,40],
-"ckernel__quant_8h.html#af70a67fd0282b522baf6898293bf0de2":[2,0,0,58,13]
+"ckernel__quant_8h.html#ad8834a1bb3edfa7fb47a2e47ab9e189a":[2,0,0,58,36]
 };

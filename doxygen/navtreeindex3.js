@@ -1,5 +1,14 @@
 var NAVTREEINDEX3 =
 {
+"checked__latent__loop_8c.html#a006ce900287bec0faa69135e2d2e94ae":[2,0,1,2,3,4],
+"checked__latent__loop_8c.html#a145307f540e473967f61ce408b912929":[2,0,1,2,3,0],
+"checked__latent__loop_8c.html#aa84ee96a688360db8ff90147bab32031":[2,0,1,2,3,3],
+"checked__latent__loop_8c.html#ac5f70d2d3518286ac13b02e32fe43718":[2,0,1,2,3,1],
+"checked__latent__loop_8c.html#ad0ca7af6378bfbcaebb5c33dc2b4f0ab":[2,0,1,2,3,2],
+"checked__latent__loop_8c_source.html":[2,0,1,2,3],
+"checked__parallel_8h.html":[2,0,0,3],
+"checked__parallel_8h.html#a18b0bc37fcce12bed458fe50f7715101":[2,0,0,3,1],
+"checked__parallel_8h.html#a7081faaa75564b9eb08d0e433cd84f9b":[2,0,0,3,2],
 "checked__parallel_8h.html#a91e6e83b6983ad0ccdf1baad6a18bd92":[2,0,0,3,3],
 "checked__parallel_8h_source.html":[2,0,0,3],
 "checked__q4__k__activation_8h.html":[2,0,0,4],
@@ -240,14 +249,5 @@ var NAVTREEINDEX3 =
 "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626a8f657a5ec55ecbec1754d096b7fe6dfc":[2,0,0,8,26,3],
 "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626aa06c3dd7314c2c13d84365296009faa9":[2,0,0,8,26,18],
 "ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626aaf964bb8f9a9c27a607c6ee0859e6d32":[2,0,0,8,26,14],
-"ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626ab33588bb6ba82308106386d40b582549":[2,0,0,8,26,8],
-"ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626ab38865d601f67bbe132d19c84d56ca72":[2,0,0,8,26,13],
-"ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626ab8dd8208c82592d08689b60edd24aebb":[2,0,0,8,26,12],
-"ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626ac5001059bca6e603670a6ee7e639b7d6":[2,0,0,8,26,2],
-"ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626ad3d60cb8062389088c4fcf71d69299f3":[2,0,0,8,26,6],
-"ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626ad9e67d5a8ca0e14416f388bc0ffdb0c8":[2,0,0,8,26,9],
-"ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626afbac4fd18b46ca874448256c93d5a82e":[2,0,0,8,26,17],
-"ck__model__abi__v8_8h.html#a6bbd69a654325d3a83f9cfb4066fbec7":[2,0,0,8,22],
-"ck__model__abi__v8_8h.html#a7062d995876d52d672e73ebb733b139d":[2,0,0,8,13],
-"ck__model__abi__v8_8h.html#a990b94b15df12f072518424b042900fd":[2,0,0,8,2]
+"ck__model__abi__v8_8h.html#a66bda251a7af012335928df3e1b04626ab33588bb6ba82308106386d40b582549":[2,0,0,8,26,8]
 };

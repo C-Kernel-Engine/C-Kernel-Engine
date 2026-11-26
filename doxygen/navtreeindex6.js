@@ -1,5 +1,14 @@
 var NAVTREEINDEX6 =
 {
+"ckernel__audio_8h.html#acf72a26ee07e106d85da5e65d7e71d59":[2,0,0,19,1],
+"ckernel__audio_8h.html#ad1367c7f14a4da63eabb6f47035bd2eb":[2,0,0,19,14],
+"ckernel__audio_8h.html#ad288c2085ac8030c9255ed07d25fc2bd":[2,0,0,19,17],
+"ckernel__audio_8h.html#ad7d987ef94d207f26bd869e78f80b5ed":[2,0,0,19,23],
+"ckernel__audio_8h.html#adf8b1ff9727b956bc11157aa96051a62":[2,0,0,19,10],
+"ckernel__audio_8h.html#adfa99d0523f008d9969a75cd60f31171":[2,0,0,19,29],
+"ckernel__audio_8h.html#ae39d8ba6626b9af8dae0e07ba7e1e89c":[2,0,0,19,27],
+"ckernel__audio_8h.html#ae40602291761aaeba8358d37f704c955":[2,0,0,19,19],
+"ckernel__audio_8h.html#af1c758eba3f2e41f26558e4d9662aefa":[2,0,0,19,4],
 "ckernel__audio_8h.html#af4abdc08264eabcc7f8066c78d4e38a6":[2,0,0,19,38],
 "ckernel__audio_8h.html#af7139f62dca603c8ed0761ef489804c5":[2,0,0,19,33],
 "ckernel__audio_8h.html#af899a2a47519d1740ab65706a5430e14":[2,0,0,19,30],
@@ -240,14 +249,5 @@ var NAVTREEINDEX6 =
 "ckernel__codegen__v6_86_8c.html#a9f6b5ba2373060f9e3c58c05b2deb62f":[2,0,1,8,5,0],
 "ckernel__codegen__v6_86_8c.html#aa4fbf6c78963864659b31924249cb09e":[2,0,1,8,5,27],
 "ckernel__codegen__v6_86_8c.html#aa9722b574f49150d15c7d2a5e2736e9c":[2,0,1,8,5,26],
-"ckernel__codegen__v6_86_8c.html#aae1b0d88edbdfac3f1c0108f88e1f02b":[2,0,1,8,5,2],
-"ckernel__codegen__v6_86_8c.html#ab27f0b23ca992db3ac33ef429d57fd36":[2,0,1,8,5,4],
-"ckernel__codegen__v6_86_8c.html#aba851166f7304fab8907b83d64b2dc27":[2,0,1,8,5,9],
-"ckernel__codegen__v6_86_8c.html#ad3379f6a59f22753041f8ed2959573a9":[2,0,1,8,5,17],
-"ckernel__codegen__v6_86_8c.html#ad53c5f6500036f0c3b7a0c864f077521":[2,0,1,8,5,25],
-"ckernel__codegen__v6_86_8c.html#ae8a84ea0f2073de536933e596c0de7df":[2,0,1,8,5,10],
-"ckernel__codegen__v6_86_8c.html#af35d2ef997b4de84524dddc75ee16265":[2,0,1,8,5,12],
-"ckernel__codegen__v6_86_8c_source.html":[2,0,1,8,5],
-"ckernel__codegen__v6_8c.html":[2,0,1,6,3],
-"ckernel__codegen__v6_8c.html#a019c1eb00e7aaa6c7c261029b383384c":[2,0,1,6,3,24]
+"ckernel__codegen__v6_86_8c.html#aae1b0d88edbdfac3f1c0108f88e1f02b":[2,0,1,8,5,2]
 };

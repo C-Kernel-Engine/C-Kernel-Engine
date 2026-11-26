@@ -778,7 +778,7 @@ Variables</h2></td></tr>
 <div class="line"><span class="lineno">  277</span>        data[i] = 0.5f * x * (1.0f + tanhf(inner));</div>
 <div class="line"><span class="lineno">  278</span>    }</div>
 <div class="line"><span class="lineno">  279</span> </div>
-<div class="line"><span class="lineno">  280</span><span class="preprocessor">#elif defined(__AVX2__)</span></div>
+<div class="line"><span class="lineno">  280</span><span class="preprocessor">#elif defined(__AVX2__) &amp;&amp; defined(__FMA__)</span></div>
 <div class="line"><span class="lineno">  281</span>    <span class="keyword">const</span> __m256 sqrt_2_pi_vec = _mm256_set1_ps(sqrt_2_over_pi);</div>
 <div class="line"><span class="lineno">  282</span>    <span class="keyword">const</span> __m256 coeff_vec = _mm256_set1_ps(coeff);</div>
 <div class="line"><span class="lineno">  283</span>    <span class="keyword">const</span> __m256 half_vec = _mm256_set1_ps(0.5f);</div>
