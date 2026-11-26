@@ -1,5 +1,8 @@
 var NAVTREEINDEX21 =
 {
+"sinusoidal__rows__checked_8c.html#acbc7996e6498c4a7714e7d379d4fccd2":[2,0,1,1,163,1],
+"sinusoidal__rows__checked_8c_source.html":[2,0,1,1,163],
+"softmax__kernels_8c.html":[2,0,1,1,164],
 "softmax__kernels_8c.html#a3d0ffc191c77d983b953984f8012589d":[2,0,1,1,164,0],
 "softmax__kernels_8c.html#a6ea7267298ef550524a6277b817a8ffb":[2,0,1,1,164,2],
 "softmax__kernels_8c.html#a920868f80137fe3e0c9cd11acb7ba567":[2,0,1,1,164,1],
@@ -246,8 +249,5 @@ var NAVTREEINDEX21 =
 "structCKLayerBackwardParams.html#a7b75fc7ac1370a2392bd7f2dff2f91f5":[1,0,47,66],
 "structCKLayerBackwardParams.html#a7cf0c367613e3e8b9985c92916c15d7e":[1,0,47,45],
 "structCKLayerBackwardParams.html#a83064b5cc6decef3782fd31cdaee55d0":[1,0,47,9],
-"structCKLayerBackwardParams.html#a85571728b71c401e0dbe808ae585ded8":[1,0,47,13],
-"structCKLayerBackwardParams.html#a888ee7a6df98528c4046b6b59b8c639c":[1,0,47,49],
-"structCKLayerBackwardParams.html#a8b0ad57a979f51ad0b14df175b2c7370":[1,0,47,48],
-"structCKLayerBackwardParams.html#a9e4a1e13e1a03430dfb1d4c35137a0c3":[1,0,47,59]
+"structCKLayerBackwardParams.html#a85571728b71c401e0dbe808ae585ded8":[1,0,47,13]
 };

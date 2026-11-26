@@ -159,6 +159,7 @@ var menudata={children:[
 {text:"i",url:"globals_type.html#index_i"},
 {text:"k",url:"globals_type.html#index_k"},
 {text:"p",url:"globals_type.html#index_p"},
+{text:"r",url:"globals_type.html#index_r"},
 {text:"s",url:"globals_type.html#index_s"},
 {text:"v",url:"globals_type.html#index_v"}]},
 {text:"Enumerations",url:"globals_enum.html",children:[

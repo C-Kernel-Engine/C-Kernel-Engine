@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['void_5ffunc_5ft_0',['void_func_t',['../ck__cli__v5_8c.html#a2425c2b3462f867da9fd2ab76d9d47b1',1,'void_func_t:&#160;ck_cli_v5.c'],['../ck__cli__v6_8c.html#a2425c2b3462f867da9fd2ab76d9d47b1',1,'void_func_t:&#160;ck_cli_v6.c']]],
-  ['vsexp_5ffn_1',['vsexp_fn',['../deltanet__chunked__bf16_8c.html#a951fd0587b3300c95e2782320da293c4',1,'deltanet_chunked_bf16.c']]]
+  ['sample_5fargmax_5ft_0',['sample_argmax_t',['../ck__cli__v5_8c.html#afda9eb047036eb6f4543c16cfb0a3d2d',1,'sample_argmax_t:&#160;ck_cli_v5.c'],['../ck__cli__v6_85_8c.html#afda9eb047036eb6f4543c16cfb0a3d2d',1,'sample_argmax_t:&#160;ck_cli_v6.5.c'],['../ck__cli__v6_86_8c.html#afda9eb047036eb6f4543c16cfb0a3d2d',1,'sample_argmax_t:&#160;ck_cli_v6.6.c'],['../ck__cli__v6_8c.html#afda9eb047036eb6f4543c16cfb0a3d2d',1,'sample_argmax_t:&#160;ck_cli_v6.c']]],
+  ['sgemm_5ffn_1',['sgemm_fn',['../deltanet__chunked__bf16_8c.html#a23f2c08b682d06e161d96ed87efeb747',1,'deltanet_chunked_bf16.c']]]
 ];

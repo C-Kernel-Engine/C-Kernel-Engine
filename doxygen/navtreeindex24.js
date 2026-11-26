@@ -1,5 +1,8 @@
 var NAVTREEINDEX24 =
 {
+"structCKSessionProgressV8.html#aeef5563640644566c7360bf112354618":[1,0,74,5],
+"structCKSessionProgressV8.html#af0dc9b2ca6ecee7c19038c9ad54aa289":[1,0,74,2],
+"structCKSessionVisualInputV8.html":[1,0,75],
 "structCKSessionVisualInputV8.html#a08272d3bee1be6f422cc97212c65406c":[1,0,75,0],
 "structCKSessionVisualInputV8.html#a497d2f82439ad5f675b430118c7e9bb3":[1,0,75,1],
 "structCKSessionVisualInputV8.html#a4dbe9cceed09174181b4865e1779f7fe":[1,0,75,2],
@@ -246,8 +249,5 @@ var NAVTREEINDEX24 =
 "structQWEN2__0__5B__DECODEFooterOffsets.html#aec463a130ddc1a065b9c753ec5c9bb19":[1,0,97,0],
 "structQWEN2__0__5B__DECODEGlobalOffsets.html":[1,0,98],
 "structQWEN2__0__5B__DECODEGlobalOffsets.html#a8e04d4088aaa68a9725b418e7566a6e9":[1,0,98,0],
-"structQWEN2__0__5B__DECODEGlobalOffsets.html#a927654a893e08df5673da7123577a3b9":[1,0,98,1],
-"structQWEN2__0__5B__DECODEHeaderOffsets.html":[1,0,99],
-"structQWEN2__0__5B__DECODEHeaderOffsets.html#a132bfc09c544e8e77e4643564e740d3b":[1,0,99,1],
-"structQWEN2__0__5B__DECODEHeaderOffsets.html#a60e3a70cccede22b6473dd0be408af24":[1,0,99,4]
+"structQWEN2__0__5B__DECODEGlobalOffsets.html#a927654a893e08df5673da7123577a3b9":[1,0,98,1]
 };

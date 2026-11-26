@@ -1,5 +1,8 @@
 var NAVTREEINDEX23 =
 {
+"structCKLayerOffsets.html#af6000f2aff58810114cbd110c77402e5":[1,0,52,20],
+"structCKLayerOptimizerOffsets.html":[1,0,53],
+"structCKLayerOptimizerOffsets.html#a081f58fcc2e8245a0383d42e7d521177":[1,0,53,2],
 "structCKLayerOptimizerOffsets.html#a142f3597b192e27b22152d7e5e1cca73":[1,0,53,36],
 "structCKLayerOptimizerOffsets.html#a14824d8d69c159d9f82752211c99df8f":[1,0,53,15],
 "structCKLayerOptimizerOffsets.html#a1bea81a97d9e230388a11aa88fcfaab8":[1,0,53,20],
@@ -246,8 +249,5 @@ var NAVTREEINDEX23 =
 "structCKSessionProgressV8.html#aa6efbe2b5e7c067d50ef0b5ebf8998b1":[1,0,74,4],
 "structCKSessionProgressV8.html#ab5c72e9c3b4866f90cc753477f224a50":[1,0,74,6],
 "structCKSessionProgressV8.html#aca1253e8c2c4f32b183658c09836dba3":[1,0,74,7],
-"structCKSessionProgressV8.html#ad217fd75924a12dc8cba5991b61adcc4":[1,0,74,0],
-"structCKSessionProgressV8.html#aeef5563640644566c7360bf112354618":[1,0,74,5],
-"structCKSessionProgressV8.html#af0dc9b2ca6ecee7c19038c9ad54aa289":[1,0,74,2],
-"structCKSessionVisualInputV8.html":[1,0,75]
+"structCKSessionProgressV8.html#ad217fd75924a12dc8cba5991b61adcc4":[1,0,74,0]
 };
