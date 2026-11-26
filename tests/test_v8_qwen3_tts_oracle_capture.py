@@ -45,7 +45,7 @@ class Qwen3TTSOracleCaptureContractTest(unittest.TestCase):
                 path.write_bytes(b"fixture")
             config_path = model_dir / "config.json"
             config_path.write_text(json.dumps({"tts_model_size": "1b7", "tts_model_type": "custom_voice"}))
-            with self.assertRaisesRegex(ValueError, "not Qwen3-TTS 0.6B"):
+            with self.assertRaisesRegex(ValueError, r"expected Qwen3-TTS 0\.6B custom_voice"):
                 capture.verify_model_dir(model_dir)
             config_path.write_text(json.dumps({"tts_model_size": "0b6", "tts_model_type": "custom_voice"}))
             with self.assertRaisesRegex(ValueError, "checksum mismatch"):

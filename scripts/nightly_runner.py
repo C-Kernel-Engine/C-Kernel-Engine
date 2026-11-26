@@ -1002,6 +1002,7 @@ TEST_SUITES = {
         "Qwen3-TTS Pinned Speech Session Contracts", "inference",
         ROOT / "tests" / "test_v8_qwen3_tts_pinned_session.py",
         unittest_targets=(
+            "tests.test_v8_qwen3_tts_pinned_session.Qwen3TTSPinnedSessionTest.test_base_speaker_replaces_only_the_codec_speaker_row",
             "tests.test_v8_qwen3_tts_pinned_session.Qwen3TTSPinnedSessionTest.test_pcm_wav_header_and_rejection",
             "tests.test_v8_qwen3_tts_pinned_session.Qwen3TTSPinnedSessionTest.test_unsupported_text_rejected_before_model_access",
             "tests.test_v8_qwen3_tts_pinned_session.Qwen3TTSPinnedSessionTest.test_request_text_selects_distinct_prompt_ids",

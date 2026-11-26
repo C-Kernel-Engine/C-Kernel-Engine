@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import json
+import ctypes
 import hashlib
 from pathlib import Path
 import tempfile
@@ -24,6 +25,70 @@ SECOND_FIXTURE = (Path(__file__).resolve().parents[1] / "tests/fixtures/tts"
 
 
 class Qwen3TTSPinnedSessionTest(unittest.TestCase):
+    def test_base_speaker_replaces_only_the_codec_speaker_row(self):
+        from version.v8.tts.qwen3_tts_base_prompt import add_base_speaker, bind_base_speaker, check_speaker
+        from version.v8.tts.build_qwen3_tts_prompt_first_block_circuit import build_circuit
+        from version.v8.scripts.compile_checked_bundle_v8 import compile_declared_f32_graph
+
+        graph = build_circuit()
+        add_base_speaker(graph)
+        ops = graph['block_types']['text_projection']['body']['ops']
+        splice = next(op for op in ops if op['id'] == 'bind_base_speaker')
+        assembly = next(op for op in ops if op['id'] == 'prompt_assembly')
+        self.assertEqual(assembly['graph_slots']['inputs']['right'], 'voice_codec_rows')
+        # Compile the actual authored row operation without downloading talker weights.
+        splice['graph_slots']['inputs']['left'] = 'external:codec_embedding_token'
+        buffers = {key: graph['activation_buffers'][key] for key in (
+            'codec_embedding_token', 'voice_codec_rows', 'speaker_vector', 'voice_left_indices', 'voice_right_indices')}
+        block = {'sequence': ['header','body','footer'], 'header': [], 'footer': [],
+                 'body': {'type': 'dense', 'ops': [splice]}}
+        graph.update(sequence=['rows'], block_types={'rows': block}, activation_buffers=buffers,
+                     activation_bindings={key: key for key in buffers})
+        graph['semantic_checkpoints']['exports'] = {
+            'bind_base_speaker': {'section': 'body', 'template_op_id': 'bind_base_speaker',
+                                  'op': splice['op'], 'checkpoints': [{
+                                      'id': 'test.voice_rows', 'producer': 'bind_base_speaker',
+                                      'tensor': 'voice_codec_rows', 'logical_layout': 'token_major',
+                                      'axis_names': ['row', 'channel'], 'storage_dtype': 'fp32'}]}}
+        graph['contract']['runtime_invariants'].update(width=1024, tokens=7, heads=1, mult=1)
+        with tempfile.TemporaryDirectory() as tmp:
+            run, arena, view, _ = compile_declared_f32_graph(Path(tmp), graph, {})
+            rows = np.arange(7 * 1024, dtype='f4').reshape(7, 1024)
+            view('codec_embedding_token')[:] = rows
+            acts = {name: {'abs_offset': view(name).ctypes.data - ctypes.addressof(arena)}
+                    for name in buffers}
+            for sign in (-1, 1):
+                voice = np.full(1024, sign * .25, 'f4')
+                bind_base_speaker(arena, acts, check_speaker(voice))
+                self.assertEqual(run(arena, len(arena)), 0)
+                expected = rows.copy()
+                expected[4] = voice
+                np.testing.assert_array_equal(view('voice_codec_rows'), expected)
+        for bad in (np.ones(192, 'f4'), np.ones(1024, 'f8'), np.full(1024, np.inf, 'f4')):
+            with self.assertRaises(ValueError):
+                check_speaker(bad)
+
+    @unittest.skipUnless(all(os.getenv(key) for key in (
+        'CKE_QWEN3_TTS_BASE_DIR', 'CKE_QWEN3_TTS_SPEAKER_VECTOR', 'CKE_QWEN3_TTS_BASE_CODES')),
+        'local Base checkpoint, speaker vector and publisher reference codes required')
+    def test_native_base_prefill_against_publisher(self):
+        from version.v8.tts.qwen3_tts_base_prompt import bind_base_speaker
+        from version.v8.tts.qwen3_tts_pinned_session import _set_inputs, _view
+        model = Path(os.environ['CKE_QWEN3_TTS_BASE_DIR'])
+        speaker = np.load(os.environ['CKE_QWEN3_TTS_SPEAKER_VECTOR'], allow_pickle=False)
+        codes = np.load(os.environ['CKE_QWEN3_TTS_BASE_CODES'], allow_pickle=False)
+        self.assertEqual(codes.shape[1:], (16,))
+        with tempfile.TemporaryDirectory() as tmp:
+            session = PinnedQwenSession(model, Path(tmp), runtime_prompts=True, speaker_vector=speaker)
+            ids, codec = _prompt_ids(model, 'Lift off.', session._tokenizer, context_tokens=None, base=True)
+            _set_inputs(session.arena, session.acts, ids, codec)
+            bind_base_speaker(session.arena, session.acts, speaker)
+            self.assertEqual(session._segments[0](session.arena, session.arena_bytes), 0)
+            names = ['talker_first_code_id', 'pred_predictor_codebook0_selected_id'] + [
+                f'pred_step{i}_selected_id' for i in range(1, 15)]
+            actual = [_view(session.arena, session.acts, name, np.int32, (1,))[0] for name in names]
+            np.testing.assert_array_equal(actual, codes[0])
+
     @unittest.skipUnless(os.environ.get("CKE_QWEN3_TTS_MODEL_DIR"),
                          "pinned CustomVoice weights unavailable; repeated native session NOT_TESTED")
     def test_repeated_pinned_native_synthesis(self):
