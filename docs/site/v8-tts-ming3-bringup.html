@@ -1039,6 +1039,26 @@ arithmetic and serving infrastructure, but does not certify this composition.</p
 <a href="https://github.com/inclusionAI/Ming-3.0-tts/blob/a39b80660bdc5a4394d5e1d41af6dbfd9c443a54/fm/CFM.py">fm/CFM.py</a>.</li>
 <li>Checkpoint metadata: <code>7247f4c94a5b2e987404ed28a5cfec41b1a4ca61</code>.
 The initial flow milestone did not load weights. A subsequent isolated publisher CPU reference loaded this checkpoint; that is not native CKE synthesis.</li></ul>
+<h2>Try a recorded voice with the dense 0.5B checkpoint</h2>
+<p>The native CLI accepts one 192-value FP32 speaker vector. The pinned publisher's CAM++ encoder extracts it from a recording. CKE projects that vector into the speaker slot before the backbone reads the text. The same voice can be reused for another sentence. Treat the vector as private voice data.</p>
+<p>From the pinned publisher checkout, with its Python environment active, prepare a personal reference file locally. Set <code>MING_CHECKPOINT</code> to the checkpoint directory.</p>
+<pre><code>import os
+from pathlib import Path
+import numpy as np
+import torchaudio
+from spkemb_extractor import SpkembExtractor
+
+audio, rate = torchaudio.load("reference.wav")
+mono = torchaudio.functional.resample(audio.mean(0, keepdim=True), rate, 16000)
+extract = SpkembExtractor(str(Path(os.environ["MING_CHECKPOINT"]) / "campplus.onnx"))
+vector = extract(mono).detach().cpu().float().numpy().reshape(192)
+np.save("speaker.npy", vector)</code></pre>
+<p>Then run the CKE CLI from its checkout.</p>
+<pre><code>python version/v8/tts/run_ming3_native_v8.py \
+  --checkpoint "$MING_CHECKPOINT" --publisher-root "$MING_PUBLISHER" \
+  --speaker-vector /path/to/speaker.npy --cached-backbone \
+  --text "The motor is spinning." --output ./ming-voice-trial</code></pre>
+<p>A CPU trial produced 59,976 samples at 44.1 kHz. A separate Whisper pass recovered the four requested words. Speaker resemblance and consistency over longer narration need listening tests. Reference-audio latent conditioning is a separate feature.</p>
 <h2>Flow update component</h2>
 <pre>difference = prediction - null_prediction
 velocity   = prediction + cfg * difference
