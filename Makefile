@@ -6997,6 +6997,7 @@ test-kernel-maps:
 		tests/test_v8_sigma_bf16_denoiser_stack.py \
 		tests/test_v8_drama3_bf16_tower.py \
 		tests/test_v8_groundhog_moe.py \
+		tests/test_v8_groundhog_score_providers.py \
 		tests/test_v8_safetensors_to_bump.py::test_gemma4_per_layer_gqa_geometry_survives_import_and_lowering
 	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_gemm_f16_clipped_n8.py
 	@$(PYTHON) $(PYTHONFLAGS) -m pytest -q tests/test_v8_gemma4_bf16_reduction_oracle.py

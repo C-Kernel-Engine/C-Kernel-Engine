@@ -9,6 +9,7 @@ class Experts:
     count: int
     top_k: int
     inner: int
+    partition_topk: bool = False
 
     def __post_init__(self):
         if (any(type(n) is not int or n < 1 for n in (self.count, self.top_k, self.inner)) or
@@ -41,7 +42,9 @@ def add_moe(backbone, index, geometry, residual):
     backbone.buffer(probs, [rows, k], "fp32")
     backbone.ops.append({
         "id": p + "route", "op": "full_softmax_topk_router",
-        "kernel": "moe_softmax_topk_router_llama_f32", "returns_status": True,
+        "kernel": ("moe_softmax_topk_router_partition_f32" if geometry.partition_topk
+                   else "moe_softmax_topk_router_llama_f32"),
+        "returns_status": True,
         "graph_slots": {"inputs": {"logits": widened}, "outputs": {"indices": ids, "weights": probs}},
         "params": {"R": rows, "E": experts, "K": k, "routed_scaling_factor": 1.0},
     })
@@ -53,10 +56,11 @@ def add_moe(backbone, index, geometry, residual):
 
     normalized = backbone.norm(p + "expert_norm", residual, w + "pre_feedforward_layernorm_2.weight",
                                rows, width, [rows, width])
+    projection = {} if backbone.cblas else {"use_blas": int(backbone.blas)}
     routed = backbone.emit(p + "expert_sum", "routed_geglu_bf16_checked", {
         "input": normalized, "ids": ids, "scores": scaled,
     }, {
-        "R": rows, "H": width, "I": inner, "E": experts, "K": k, "use_blas": int(backbone.blas),
+        "R": rows, "H": width, "I": inner, "E": experts, "K": k, **projection,
         "call_constants": {
             "rows": rows, "width": width, "inner": inner, "experts": experts, "top_k": k,
             "hidden_elements": rows * width, "selected_elements": rows * k,
@@ -66,15 +70,15 @@ def add_moe(backbone, index, geometry, residual):
     }, [rows, width], weights={
         "gate_up": (w + "experts.gate_up_proj", [experts, 2 * inner, width], "BF16"),
         "down": (w + "experts.down_proj", [experts, width, inner], "BF16"),
-    }, output="out")
+    }, output="out", provider="routed_geglu_bf16_cblas_checked" if backbone.cblas else None)
     backbone.buffer(p + "expert_routes", [rows, k, width])
     backbone.ops[-1]["graph_slots"]["outputs"]["routes"] = p + "expert_routes"
     return routed
 
 
-def build_moe_replay(rows, width, geometry, epsilon, *, blas=False):
+def build_moe_replay(rows, width, geometry, epsilon, *, blas=False, cblas=False):
     """Take residual rows at the exact ingress of a decoder-layer expert branch."""
-    backbone = Backbone(rows, 1, width, 1, width, epsilon, blas=blas)
+    backbone = Backbone(rows, 1, width, 1, width, epsilon, blas=blas, cblas=cblas)
     backbone.graph["name"] = "packed_gemma_moe_replay"
     backbone.graph["native_entry"]["function"] = "ck_packed_gemma_moe_replay"
     backbone.ops.clear()

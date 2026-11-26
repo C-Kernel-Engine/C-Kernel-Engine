@@ -847,3 +847,116 @@ int sigmoid_topk_router_checked_f32(const float *logits, size_t logits_elements,
     );
     return 0;
 }
+
+static void swap_route(int *a, int *b)
+{
+    const int temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+static void sort_routes(const float *prob, int *order, int first, int end)
+{
+    for (int i = first + 1; i < end; ++i) {
+        const int current = order[i];
+        int j = i;
+        while (j > first && prob[order[j - 1]] < prob[current]) {
+            order[j] = order[j - 1];
+            --j;
+        }
+        order[j] = current;
+    }
+}
+
+/* Rank only as far as the cutoff. Compare scores alone so equal-score
+ * candidates are exchanged by the same median-of-three partition policy
+ * used by the CPU nth_element oracle. */
+static void partition_topk_routes(const float *prob, int *order, int count, int k)
+{
+    int first = 0, end = count, budget = 0;
+    for (int n = count; n > 1; n /= 2)
+        budget += 2;
+    while (end - first > 3 && budget-- > 0) {
+        const int a = first + 1, b = first + (end - first) / 2, c = end - 1;
+        const float va = prob[order[a]], vb = prob[order[b]], vc = prob[order[c]];
+        int median;
+        if (va > vb) {
+            median = vb > vc ? b : va > vc ? c : a;
+        } else {
+            median = va > vc ? a : vb > vc ? c : b;
+        }
+        swap_route(&order[first], &order[median]);
+        const float pivot = prob[order[first]];
+        int left = first + 1, right = end;
+        for (;;) {
+            while (prob[order[left]] > pivot) ++left;
+            do { --right; } while (pivot > prob[order[right]]);
+            if (left >= right)
+                break;
+            swap_route(&order[left], &order[right]);
+            ++left;
+        }
+        if (left <= k - 1)
+            first = left;
+        else
+            end = left;
+    }
+    sort_routes(prob, order, first, end);
+    sort_routes(prob, order, 0, k - 1);
+}
+
+int moe_softmax_topk_router_partition_f32_workspace(
+    const float *logits, int *indices, float *weights, int rows, int n_experts,
+    int top_k, float routed_scaling_factor, void *workspace, size_t workspace_bytes)
+{
+    const size_t row_bytes = (size_t)n_experts * (sizeof(float) + sizeof(int));
+    if (!logits || !indices || !weights || !workspace || rows <= 0 || n_experts <= 0 ||
+        top_k <= n_experts / 64 || top_k > n_experts ||
+        (size_t)n_experts > SIZE_MAX / (sizeof(float) + sizeof(int)) || workspace_bytes < row_bytes ||
+        (uintptr_t)workspace % _Alignof(float) || !isfinite(routed_scaling_factor))
+        return -1;
+    if ((size_t)rows > SIZE_MAX / (size_t)n_experts)
+        return -1;
+    _Static_assert(sizeof(float) == sizeof(int), "route workspace slot size");
+    const size_t inputs = (size_t)rows * n_experts;
+    const size_t outputs = (size_t)rows * top_k;
+    const size_t scratch = (size_t)n_experts * 2;
+    const float *index_region = (const float *)indices;
+    if (!ck_checked_region(logits, inputs) || !ck_checked_region(index_region, outputs) ||
+        !ck_checked_region(weights, outputs) || !ck_checked_region(workspace, scratch) ||
+        ck_checked_overlap(index_region, outputs, weights, outputs) ||
+        ck_checked_overlap(index_region, outputs, logits, inputs) ||
+        ck_checked_overlap(weights, outputs, logits, inputs) ||
+        ck_checked_overlap(workspace, scratch, index_region, outputs) ||
+        ck_checked_overlap(workspace, scratch, weights, outputs) ||
+        ck_checked_overlap(workspace, scratch, logits, inputs))
+        return -1;
+    if (!ck_checked_finite(logits, inputs))
+        return -2;
+
+    float *prob = workspace;
+    int *order = (int *)(prob + n_experts);
+    for (int r = 0; r < rows; ++r) {
+        const float *row = logits + (size_t)r * n_experts;
+        float max_value = row[0];
+        for (int j = 1; j < n_experts; ++j) {
+            if (row[j] > max_value)
+                max_value = row[j];
+        }
+        const float inverse = (float)(1.0 / ck_moe_llama_softmax_row(prob, row, n_experts, max_value));
+        for (int j = 0; j < n_experts; ++j) {
+            prob[j] *= inverse;
+            order[j] = j;
+        }
+        partition_topk_routes(prob, order, n_experts, top_k);
+        double sum = 0.0;
+        for (int slot = 0; slot < top_k; ++slot)
+            sum += prob[order[slot]];
+        const float denominator = fmaxf((float)sum, 6.103515625e-5f);
+        for (int slot = 0; slot < top_k; ++slot) {
+            indices[(size_t)r * top_k + slot] = order[slot];
+            weights[(size_t)r * top_k + slot] = (prob[order[slot]] / denominator) * routed_scaling_factor;
+        }
+    }
+    return 0;
+}

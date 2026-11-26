@@ -143,3 +143,60 @@ int ck_linear_rows_bf16_blas_checked(
     memcpy(output, staged, c * sizeof(*output));
     return 0;
 }
+
+typedef void (*ck_bf16_gemm_fn)(int, int, int, int, int, int, float,
+                               const uint16_t *, int, const uint16_t *, int, float, float *, int);
+
+static pthread_once_t bf16_gemm_once = PTHREAD_ONCE_INIT;
+static ck_bf16_gemm_fn bf16_gemm;
+
+static void bind_bf16_gemm(void)
+{
+    const char *path = getenv("CK_BLAS_LIBRARY");
+    void *library = path && *path ? dlopen(path, RTLD_NOW | RTLD_LOCAL) : RTLD_DEFAULT;
+    if (path && *path && !library)
+        return;
+    void *symbol = dlsym(library, "cblas_gemm_bf16bf16f32");
+    _Static_assert(sizeof(symbol) == sizeof(bf16_gemm), "CBLAS function pointer size");
+    memcpy(&bf16_gemm, &symbol, sizeof(bf16_gemm));
+}
+
+int ck_linear_rows_bf16_cblas_checked(
+    const uint16_t *input, size_t input_elements, const uint16_t *weight, size_t weight_elements,
+    uint16_t *output, size_t output_elements, float *work, size_t work_elements,
+    size_t rows, size_t input_width, size_t output_width)
+{
+    if (!rows || !input_width || !output_width || rows > INT_MAX ||
+        input_width > INT_MAX || output_width > INT_MAX ||
+        rows > SIZE_MAX / input_width || output_width > SIZE_MAX / input_width ||
+        rows > SIZE_MAX / output_width)
+        return -2;
+    const size_t a = rows * input_width, b = output_width * input_width, c = rows * output_width;
+    if (a > input_elements || b > weight_elements || c > output_elements || c > work_elements ||
+        !work || (uintptr_t)work % _Alignof(float) || c > SIZE_MAX / sizeof(float))
+        return -2;
+    const uint16_t *work_region = (const uint16_t *)work;
+    const size_t work_bits = c * (sizeof(float) / sizeof(uint16_t));
+    if (!region_valid(input, a) || !region_valid(weight, b) || !region_valid(output, c) ||
+        !region_valid(work_region, work_bits) || overlap(output, c, input, a) ||
+        overlap(output, c, weight, b) || overlap(work_region, work_bits, input, a) ||
+        overlap(work_region, work_bits, weight, b) || overlap(work_region, work_bits, output, c))
+        return -1;
+    for (size_t i = 0; i < a; ++i)
+        if (!isfinite(bf16_to_float(input[i]))) return -3;
+    for (size_t i = 0; i < b; ++i)
+        if (!isfinite(bf16_to_float(weight[i]))) return -3;
+    pthread_once(&bf16_gemm_once, bind_bf16_gemm);
+    if (!bf16_gemm)
+        return -4;
+
+    enum { ROW_MAJOR = 101, NO_TRANSPOSE = 111, TRANSPOSE = 112 };
+    const int m = (int)rows, n = (int)output_width, k = (int)input_width;
+    bf16_gemm(ROW_MAJOR, NO_TRANSPOSE, TRANSPOSE, m, n, k,
+              1.0f, input, k, weight, k, 0.0f, work, n);
+    for (size_t i = 0; i < c; ++i)
+        if (!isfinite(bf16_to_float(float_to_bf16(work[i])))) return -3;
+    for (size_t i = 0; i < c; ++i)
+        output[i] = float_to_bf16(work[i]);
+    return 0;
+}

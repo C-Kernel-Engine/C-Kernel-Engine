@@ -118,7 +118,7 @@ def manifest(graph):
 
 
 def run(checkpoint, request_path, output, *, blas=True, limit=None, keep_arena=False,
-        oracle_path=None, max_abs=None, max_rmse=None):
+        oracle_path=None, max_abs=None, max_rmse=None, cblas=False, partition_topk=False):
     request = json.loads(request_path.read_text())
     revision = request.get("checkpoint")
     hashes = checkpoint_hashes(revision)
@@ -139,7 +139,9 @@ def run(checkpoint, request_path, output, *, blas=True, limit=None, keep_arena=F
         raise ValueError("checkpoint expert configuration differs from its pinned policy")
     experts = None
     if text["enable_moe_block"]:
-        experts = Experts(text["num_experts"], text["top_k_experts"], text["moe_intermediate_size"])
+        experts = Experts(text["num_experts"], text["top_k_experts"], text["moe_intermediate_size"], partition_topk)
+    elif partition_topk:
+        raise ValueError("partition top-k requires routed experts")
     full = limit is None
     if limit is not None:
         if not 1 <= limit < len(layers):
@@ -154,7 +156,7 @@ def run(checkpoint, request_path, output, *, blas=True, limit=None, keep_arena=F
     option_column = {token: i for i, token in enumerate(option_ids)}
     width = text["hidden_size"]
     graph = Backbone(len(inverse), len(tokens), width, text["num_attention_heads"],
-                     text["intermediate_size"], text["rms_norm_eps"], blas=blas)
+                     text["intermediate_size"], text["rms_norm_eps"], blas=blas, cblas=cblas)
     hidden = "input"
     frequencies = {}
     for index, layer in enumerate(layers):
@@ -227,7 +229,8 @@ def run(checkpoint, request_path, output, *, blas=True, limit=None, keep_arena=F
     report = {
         "checkpoint": revision, "verified_files": weights.verified, "request_sha256": request_sha,
         "layers": len(layers), "tokens": len(packed.token_ids), "library_sha256": file_sha256(library),
-        "projection": "fp64_blas" if blas else "fp64_ordered_scalar", "native_seconds": seconds,
+        "projection": "bf16_cblas" if cblas else "fp64_blas" if blas else "fp64_ordered_scalar",
+        "routing": "partition_topk" if partition_topk else "default", "native_seconds": seconds,
     }
     if full:
         report["questions"] = [
@@ -273,12 +276,16 @@ def main():
     parser.add_argument("--oracle", type=Path, help="compare labeled raw option scores on a full run")
     parser.add_argument("--max-abs", type=float)
     parser.add_argument("--max-rmse", type=float)
-    parser.add_argument("--scalar", action="store_true", help="use the ordered scalar FP64 projection")
+    projection = parser.add_mutually_exclusive_group()
+    projection.add_argument("--scalar", action="store_true", help="use the ordered scalar FP64 projection")
+    projection.add_argument("--bf16-cblas", action="store_true", help="use native BF16 CBLAS for row projections")
+    parser.add_argument("--partition-topk", action="store_true", help="use partition-based expert tie selection")
     parser.add_argument("--keep-arena", action="store_true")
     args = parser.parse_args()
     report = run(args.checkpoint, args.request, args.output, blas=not args.scalar,
                  limit=args.layers, keep_arena=args.keep_arena, oracle_path=args.oracle,
-                 max_abs=args.max_abs, max_rmse=args.max_rmse)
+                 max_abs=args.max_abs, max_rmse=args.max_rmse, cblas=args.bf16_cblas,
+                 partition_topk=args.partition_topk)
     print(json.dumps(report, indent=2))
     return 0 if report.get("comparison", {"pass": True})["pass"] else 1
 

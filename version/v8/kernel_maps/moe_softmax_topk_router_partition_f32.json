@@ -1,0 +1,220 @@
+{
+  "id": "moe_softmax_topk_router_partition_f32",
+  "op": "full_softmax_topk_router",
+  "operation_interface": "moe_router.full_softmax.partition_topk_renorm.fp32.v1",
+  "selection": {
+    "status": "candidate",
+    "priority": 200,
+    "equivalence_group": "partition_full_softmax_topk_selected_renorm_fp32_avx2",
+    "phases": [
+      "prefill",
+      "decode"
+    ]
+  },
+  "physical_contract_version": 1,
+  "contract_schema_version": 1,
+  "numerical_contract": "partition_full_softmax_topk_selected_renorm_fp32_avx2",
+  "variant": "fp32_partition_equal_scores",
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "logits",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "E"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "indices",
+      "dtype": "i32",
+      "shape": [
+        "R",
+        "K"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "weights",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "K"
+      ],
+      "layout": "token_major_contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "scratch": [
+    {
+      "name": "probabilities",
+      "dtype": "fp32",
+      "alignment": 64,
+      "lifetime": "kernel_call",
+      "size_resolution": "required",
+      "size_bytes": "align64(E * 8)",
+      "desc": "Planner-owned full-softmax row and adjacent int32 permutation row."
+    }
+  ],
+  "dims": [
+    "R",
+    "E",
+    "K"
+  ],
+  "params": [
+    {
+      "name": "routed_scaling_factor",
+      "dtype": "fp32"
+    }
+  ],
+  "constraints": {
+    "requires": [
+      "avx2",
+      "fma"
+    ],
+    "shape": {
+      "E_multiple": 8
+    },
+    "notes": "Use partition top-k for K > E / 64. Compare scores alone; median-of-three partition determines the selected set at cutoff ties."
+  },
+  "impl": {
+    "function": "moe_softmax_topk_router_partition_f32_workspace",
+    "c_declaration": "int moe_softmax_topk_router_partition_f32_workspace(const float *logits, int *indices, float *weights, int rows, int n_experts, int top_k, float routed_scaling_factor, void *workspace, size_t workspace_bytes);",
+    "sources": [
+      "src/kernels/topk_kernels.c"
+    ]
+  },
+  "implementation": {
+    "isa_dispatch": "compile_time",
+    "threading": {
+      "runtime": "serial",
+      "work_partition": [
+        "independent_rows"
+      ],
+      "dispatch": [
+        "inline"
+      ],
+      "reduction_order_effect": "none"
+    }
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "logits",
+        "source": "activation:logits",
+        "cast": "const float*",
+        "ports": [
+          "input:logits"
+        ]
+      },
+      {
+        "name": "indices",
+        "source": "output:indices",
+        "cast": "int*",
+        "ports": [
+          "output:indices"
+        ]
+      },
+      {
+        "name": "weights",
+        "source": "output:weights",
+        "cast": "float*",
+        "ports": [
+          "output:weights"
+        ]
+      },
+      {
+        "name": "rows",
+        "source": "dim:R"
+      },
+      {
+        "name": "n_experts",
+        "source": "dim:E"
+      },
+      {
+        "name": "top_k",
+        "source": "dim:K"
+      },
+      {
+        "name": "routed_scaling_factor",
+        "source": "param:routed_scaling_factor"
+      },
+      {
+        "name": "workspace",
+        "source": "scratch:probabilities",
+        "cast": "void*"
+      },
+      {
+        "name": "workspace_bytes",
+        "source": "scratch_size:probabilities"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_groundhog_score_providers.py"
+    ]
+  },
+  "reference": {
+    "status": "candidate",
+    "notes": "Cutoff tie sets checked on the pinned CPU nth_element fixture. Ranking ties above the cutoff have no effect on ascending-ID expert accumulation."
+  },
+  "numerical_capabilities": [
+    {
+      "contract_id": "partition_full_softmax_topk_selected_renorm_fp32_avx2",
+      "status": "observed",
+      "phases": [
+        "prefill",
+        "decode"
+      ],
+      "function": "moe_softmax_topk_router_partition_f32_workspace",
+      "explicit_selector": true,
+      "implementation": {
+        "isa_dispatch": "compile_time",
+        "threading": {
+          "runtime": "serial",
+          "work_partition": [
+            "independent_rows"
+          ],
+          "dispatch": [
+            "inline"
+          ],
+          "reduction_order_effect": "none"
+        }
+      },
+      "arithmetic": {
+        "partial_accumulator": "fp64",
+        "merge_order": "selected_slot_order",
+        "deterministic": true,
+        "thread_count_changes_arithmetic_order": false,
+        "split_strategy": "independent_outputs"
+      }
+    }
+  ],
+  "notes": "FP32 softmax and allocation-free partition top-k for CPU oracle replay. The checked provider independently renormalizes retained softmax probabilities."
+}

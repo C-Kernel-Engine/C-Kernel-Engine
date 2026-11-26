@@ -16,11 +16,11 @@ class Layer:
 class Backbone:
     """Author operations, buffer dimensions and checkpoint bindings for native lowering."""
 
-    def __init__(self, rows, table_rows, width, heads, inner, epsilon, *, blas=False):
+    def __init__(self, rows, table_rows, width, heads, inner, epsilon, *, blas=False, cblas=False):
         if any(type(n) is not int or n <= 0 for n in (rows, table_rows, width, heads, inner)):
             raise ValueError("positive integer backbone dimensions required")
         self.rows, self.width, self.heads, self.inner, self.epsilon = rows, width, heads, inner, epsilon
-        self.blas = blas
+        self.blas, self.cblas = blas, cblas
         self.graph, self.config = ingress(
             rows, table_rows=table_rows, width=width, q_width=heads, kv_width=heads, epsilon=epsilon,
         )
@@ -76,12 +76,18 @@ class Backbone:
             "input_elements": rows * width, "weight_elements": channels * width,
             "output_elements": rows * channels, "staged_elements": rows * channels,
         }
-        if self.blas:
+        provider = None
+        if self.cblas:
+            provider = "linear_rows_bf16_cblas_checked"
+            constants.pop("staged_elements")
+            constants["work_elements"] = rows * channels
+        elif self.blas:
+            provider = "linear_rows_bf16_blas_checked"
             constants["work_elements"] = rows * width + channels * width + rows * channels
         return self.emit(name, "linear_rows_bf16_checked", {"input": source}, {
             "M": rows, "K": width, "N": channels, "call_constants": constants,
         }, [rows, channels], weights={"weight": (weight, [channels, width], "BF16")},
-            provider="linear_rows_bf16_blas_checked" if self.blas else None)
+            provider=provider)
 
     def rotate(self, name, source, heads, dim, visibility):
         return self.emit(name, "rope_split_positions_bf16_checked",

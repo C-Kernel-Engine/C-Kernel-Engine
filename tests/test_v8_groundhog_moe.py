@@ -9,12 +9,13 @@ from version.v8.decision.build_groundhog_moe import Experts, build_moe_replay
 from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_graph
 
 
-@pytest.mark.parametrize("blas", [False, True])
-def test_connected_moe_generated_against_torch(tmp_path, monkeypatch, blas):
+@pytest.mark.parametrize("projection", ["scalar", "fp64_blas", "bf16_cblas"])
+def test_connected_moe_generated_against_torch(tmp_path, monkeypatch, projection):
     torch = pytest.importorskip("torch")
-    if blas:
+    if projection != "scalar":
         path = Path(torch.__file__).parent / "lib/libtorch_cpu.so"
-        if not path.is_file() or not hasattr(C.CDLL(str(path)), "dgemm_"):
+        symbol = "cblas_gemm_bf16bf16f32" if projection == "bf16_cblas" else "dgemm_"
+        if not path.is_file() or not hasattr(C.CDLL(str(path)), symbol):
             pytest.skip("LP64 BLAS unavailable")
         monkeypatch.setenv("CK_BLAS_LIBRARY", str(path))
 
@@ -38,7 +39,8 @@ def test_connected_moe_generated_against_torch(tmp_path, monkeypatch, blas):
     def numpy(tensor):
         return tensor.contiguous().view(torch.uint16).numpy() if tensor.dtype == torch.bfloat16 else tensor.numpy()
 
-    graph = build_moe_replay(rows, width, geometry, 1e-6, blas=blas)
+    graph = build_moe_replay(rows, width, geometry, 1e-6, blas=projection == "fp64_blas",
+                             cblas=projection == "bf16_cblas")
     invoke, arena, view, _ = compile_checked_weight_graph(
         tmp_path, graph.graph, {k: numpy(v) for k, v in weights.items()}, graph.weights,
         source_config=graph.config,
