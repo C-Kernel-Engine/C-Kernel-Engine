@@ -1,5 +1,6 @@
 var NAVTREEINDEX26 =
 {
+"structck__checked__latent__loop.html#ad3312399bafd1da5d1f7b148d4ff571d":[1,0,20,14],
 "structck__checked__latent__loop.html#ad622fd6a290792b9b125290ced1933fd":[1,0,20,29],
 "structck__checked__latent__loop.html#ae94574830b4d75a174f7113934b2cc90":[1,0,20,24],
 "structck__checked__latent__loop.html#aecf681f2fbcbbb6b94ae7a126f878ff1":[1,0,20,5],
@@ -248,6 +249,5 @@ var NAVTREEINDEX26 =
 "tokenizer_8h.html#ad6c5fe6b7a2df85a99504e702348a0bb":[2,0,0,1,3,12],
 "tokenizer_8h.html#ae246055217081d433db25cb6a754f5b9":[2,0,0,1,3,25],
 "tokenizer_8h.html#ae2ac59d55593a1262747f8e0c4b575d9":[2,0,0,1,3,32],
-"tokenizer_8h.html#ae3d34509ad9d854b81ca3af3ea4b2198":[2,0,0,1,3,3],
-"tokenizer_8h.html#ae4588e8ec34270c75f204c1888792113":[2,0,0,1,3,5]
+"tokenizer_8h.html#ae3d34509ad9d854b81ca3af3ea4b2198":[2,0,0,1,3,3]
 };

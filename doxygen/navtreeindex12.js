@@ -1,5 +1,6 @@
 var NAVTREEINDEX12 =
 {
+"ckernel__quant_8h.html#aa18d3f14b90d1f8a16ea4c1f811f2a6e":[2,0,0,58,34],
 "ckernel__quant_8h.html#aa217c07d43400999fb76ccfcdda2a47d":[2,0,0,58,12],
 "ckernel__quant_8h.html#aa6d6be89dba6b145e0bb597417b33861":[2,0,0,58,11],
 "ckernel__quant_8h.html#aad813e4bdcbac9185791f31e3558f770":[2,0,0,58,21],
@@ -248,6 +249,5 @@ var NAVTREEINDEX12 =
 "deepseek__kernels_8c.html#a4e29c86ada4d525f0e3ffc4aeb03c3b7":[2,0,1,1,51,7],
 "deepseek__kernels_8c.html#a56a3b28ef641f0c78cfbbb7a20b8e86d":[2,0,1,1,51,11],
 "deepseek__kernels_8c.html#a5cf609c6189f831fd35aebb7b18d14da":[2,0,1,1,51,6],
-"deepseek__kernels_8c.html#a5f3cd25acd6882deffb633effd2e7560":[2,0,1,1,51,17],
-"deepseek__kernels_8c.html#a616166a7b2d278032964e9120d2b1be9":[2,0,1,1,51,20]
+"deepseek__kernels_8c.html#a5f3cd25acd6882deffb633effd2e7560":[2,0,1,1,51,17]
 };

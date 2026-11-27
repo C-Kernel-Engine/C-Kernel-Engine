@@ -1,5 +1,6 @@
 var NAVTREEINDEX20 =
 {
+"rmsnorm__kernels_8c.html#a6f5d41513aebcf5170ede8b64de0bea8":[2,0,1,1,152,16],
 "rmsnorm__kernels_8c.html#a84e08713e6234a99c0559a1538fa7a0c":[2,0,1,1,152,13],
 "rmsnorm__kernels_8c.html#a9a068ed02d809a81a23f09e61b820baf":[2,0,1,1,152,4],
 "rmsnorm__kernels_8c.html#aae8ede0a82b914bbd6191d39c29b4e76":[2,0,1,1,152,17],
@@ -248,6 +249,5 @@ var NAVTREEINDEX20 =
 "rwkv7__decode_8c.html#ae91299ecfbf50dfdee45359952b807a9":[2,0,1,1,162,18],
 "rwkv7__decode_8c.html#aeee676bb3d2786be1ab4ff5f72d8aae2":[2,0,1,1,162,6],
 "rwkv7__decode_8c.html#af58337839fd5324c8e129bc9b925290c":[2,0,1,1,162,15],
-"rwkv7__decode_8c_source.html":[2,0,1,1,162],
-"select__next__id__checked_8c.html":[2,0,1,1,163]
+"rwkv7__decode_8c_source.html":[2,0,1,1,162]
 };

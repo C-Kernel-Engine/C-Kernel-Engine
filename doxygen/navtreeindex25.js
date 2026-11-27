@@ -1,5 +1,6 @@
 var NAVTREEINDEX25 =
 {
+"structNetworkInterface.html#a6aeca68cb500898ceebc5a70b984ed10":[1,0,90,1],
 "structNetworkInterface.html#a84e07456601797298baa97779bbee579":[1,0,90,2],
 "structNetworkInterface.html#a943270da345cf36912ed3ec3a957e15c":[1,0,90,14],
 "structNetworkInterface.html#a96c5c432b9800d9475c5b71b03d956d4":[1,0,90,11],
@@ -248,6 +249,5 @@ var NAVTREEINDEX25 =
 "structck__checked__latent__loop.html#a9dbbc50d61625d891c57be0668fa9430":[1,0,20,3],
 "structck__checked__latent__loop.html#a9eb45963e318b7ef92972e8127bbc0f9":[1,0,20,11],
 "structck__checked__latent__loop.html#aa5a2f5ffa18d4d4c03c09137a8e66c17":[1,0,20,31],
-"structck__checked__latent__loop.html#abdd90752f565e3ccab3b7031547f6950":[1,0,20,25],
-"structck__checked__latent__loop.html#ad3312399bafd1da5d1f7b148d4ff571d":[1,0,20,14]
+"structck__checked__latent__loop.html#abdd90752f565e3ccab3b7031547f6950":[1,0,20,25]
 };

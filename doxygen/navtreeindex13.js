@@ -1,5 +1,6 @@
 var NAVTREEINDEX13 =
 {
+"deepseek__kernels_8c.html#a616166a7b2d278032964e9120d2b1be9":[2,0,1,1,51,20],
 "deepseek__kernels_8c.html#a66957d98f0155057099dfe060c13c55f":[2,0,1,1,51,31],
 "deepseek__kernels_8c.html#a6700a4c759f698eba1825ff1b7d27d3e":[2,0,1,1,51,19],
 "deepseek__kernels_8c.html#a715106bc2b7b505a7b03a77a53f4485c":[2,0,1,1,51,36],
@@ -248,6 +249,5 @@ var NAVTREEINDEX13 =
 "geglu__kernels_8c.html#a27c144b4c5f41b5573f53214034dd0cb":[2,0,1,1,65,0],
 "geglu__kernels_8c.html#a2a12d04e9c4613505f7519864d4afda5":[2,0,1,1,65,5],
 "geglu__kernels_8c.html#a44b759126bd6e478b5fc2720aa0dd2ea":[2,0,1,1,65,3],
-"geglu__kernels_8c.html#a5c3f0e226acc65c4c53f1b047e796e9c":[2,0,1,1,65,9],
-"geglu__kernels_8c.html#a80b1ec81e751b153977f05a3e44b4fda":[2,0,1,1,65,6]
+"geglu__kernels_8c.html#a5c3f0e226acc65c4c53f1b047e796e9c":[2,0,1,1,65,9]
 };

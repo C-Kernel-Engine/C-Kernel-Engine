@@ -1,5 +1,6 @@
 var NAVTREEINDEX17 =
 {
+"globals_func.html":[2,1,1],
 "globals_func.html":[2,1,1,0],
 "globals_func_a.html":[2,1,1,1],
 "globals_func_b.html":[2,1,1,2],
@@ -248,6 +249,5 @@ var NAVTREEINDEX17 =
 "layernorm__kernels__bf16_8c.html":[2,0,1,1,117],
 "layernorm__kernels__bf16_8c.html#aa7733a43d00131cdc95692c34076b02e":[2,0,1,1,117,0],
 "layernorm__kernels__bf16_8c.html#ad8b1ba75e043f61ad20c8be7064a0de0":[2,0,1,1,117,2],
-"layernorm__kernels__bf16_8c.html#af62acc8f81d07c3913e0036ce21e6b76":[2,0,1,1,117,1],
-"layernorm__kernels__bf16_8c_source.html":[2,0,1,1,117]
+"layernorm__kernels__bf16_8c.html#af62acc8f81d07c3913e0036ce21e6b76":[2,0,1,1,117,1]
 };
