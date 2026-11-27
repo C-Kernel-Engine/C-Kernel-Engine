@@ -5508,6 +5508,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "routed_geglu_bf16_checked": "routed_geglu_bf16_checked",
     "geglu_tanh_bf16_checked": "geglu_tanh_bf16_checked",
     "concat_features_bf16_checked": "concat_features_bf16_checked",
+    "argmax_values_bf16_checked": "argmax_values_bf16_checked",
     "sigmoid_mul_bf16_checked": "sigmoid_mul_bf16_checked",
     "rope_interleaved_partial_bf16_checked": "rope_interleaved_partial_bf16_checked",
     "swiglu_bf16_checked": "swiglu_bf16_checked",

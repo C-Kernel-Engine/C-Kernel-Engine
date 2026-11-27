@@ -3,7 +3,7 @@ from version.v8.scripts.replay_bf16_projection_bundle_v8 import projection_graph
 
 
 def build_circuit(rows, *, width=2048, heads=16, kv_heads=2, dim=256, rotary=64,
-                  inner=6144, vocabulary=4096, blas=False):
+                  inner=6144, vocabulary=4096, blas=False, enrich=True, semantic_only=False):
     if (any(type(n) is not int or n < 1 for n in (rows, width, heads, kv_heads, dim, rotary, inner, vocabulary))
             or heads % kv_heads or rotary > dim or rotary % 2):
         raise ValueError("invalid codebook-tower geometry")
@@ -52,12 +52,13 @@ def build_circuit(rows, *, width=2048, heads=16, kv_heads=2, dim=256, rotary=64,
         elements = rows * channels
         emit(name, op, inputs, {"N": elements, "call_constants": {"elements": elements}}, channels)
 
-    for name in ("hidden", "unseen_sum"):
-        buffer(name, [rows, width])
+    buffer("hidden", [rows, width])
+    if enrich:
+        buffer("unseen_sum", [rows, width])
     buffer("code_rows", [rows], "i32")
     buffer("positions", [rows], "i32")
     buffer("ranges", [rows, 4], "i32")
-    table_rows = vocabulary + 1
+    table_rows = vocabulary if semantic_only else vocabulary + 1
     buffer("embedding_table", [table_rows, width])
     emit("embedding", "gather_rows_bf16_checked",
          {"input": "external:embedding_table", "indices": "external:code_rows"},
@@ -65,8 +66,11 @@ def build_circuit(rows, *, width=2048, heads=16, kv_heads=2, dim=256, rotary=64,
              "input_elements": table_rows * width, "index_elements": rows,
              "output_elements": rows * width, "input_rows": table_rows, "output_rows": rows, "width": width,
          }}, width, output="output")
-    pointwise("enriched", "add_bf16_checked", {"left": "embedding", "right": "external:unseen_sum"}, width)
-    normalize("enorm", "enriched", width, "enorm.weight")
+    embedding = "embedding"
+    if enrich:
+        pointwise("enriched", "add_bf16_checked", {"left": embedding, "right": "external:unseen_sum"}, width)
+        embedding = "enriched"
+    normalize("enorm", embedding, width, "enorm.weight")
     normalize("hnorm", "external:hidden", width, "hnorm.weight")
     emit("concat", "concat_features_bf16_checked", {"left": "enorm", "right": "hnorm"},
          {"R": rows, "A": width, "B": width, "C": 2 * width, "call_constants": {
