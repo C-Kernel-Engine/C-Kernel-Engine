@@ -22,6 +22,7 @@ def resolve_exports(graph,layout,calls,providers,exported=()):
                     if port['name']==label:
                         dtype={'f32':'fp32','float32':'fp32','int32':'i32'}.get(port['dtype'],port['dtype'])
                         used.setdefault(name,set()).add(dtype)
+    element_bytes={"fp32":4,"i32":4,"fp64":8,"bf16":2}
     ports={}
     for name,spec in declaration.get('ports',{}).items():
         if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*',name) or set(spec)-{'buffer','shape','slice'}:
@@ -30,8 +31,9 @@ def resolve_exports(graph,layout,calls,providers,exported=()):
         types=used.get(buffer,set())
         if len(types)!=1:raise ValueError('execution port has missing or ambiguous provider dtype: '+name)
         dtype=next(iter(types))
-        if buffer not in buffers or buffer not in graph['activation_buffers'] or dtype not in ('fp32','i32'):
+        if buffer not in buffers or buffer not in graph['activation_buffers'] or dtype not in element_bytes:
             raise ValueError('unknown buffer or execution dtype')
+        width=element_bytes[dtype]
         full=graph['activation_buffers'][buffer]['shape']
         if not isinstance(full,list) or any(type(v) is not int or v<1 for v in full):raise ValueError('invalid execution port shape')
         shape=list(full);offset=buffers[buffer]['abs_offset'];slice_spec=spec.get('slice')
@@ -39,9 +41,9 @@ def resolve_exports(graph,layout,calls,providers,exported=()):
             if set(slice_spec)!={'axis','start','length'} or slice_spec['axis']!=0:raise ValueError('only checked contiguous leading-axis slices are supported')
             start=slice_spec['start'];length=slice_spec['length']
             if type(start) is not int or type(length) is not int or start<0 or length<1 or start+length>shape[0]:raise ValueError('execution port slice exceeds tensor')
-            offset+=start*math.prod(shape[1:])*4;shape[0]=length
+            offset+=start*math.prod(shape[1:])*width;shape[0]=length
         if spec['shape']!=shape:raise ValueError('execution port shape differs from compiled tensor: '+name)
-        size=math.prod(shape)*4;physical=buffers[buffer]
+        size=math.prod(shape)*width;physical=buffers[buffer]
         if offset<physical['abs_offset'] or offset+size>physical['abs_offset']+physical['size']:raise ValueError('execution port exceeds allocation')
         ports[name]={'buffer':buffer,'dtype':dtype,'shape':shape,'offset':offset,'elements':math.prod(shape),'bytes':size,'source_shape':full,'slice':slice_spec}
     from codegen_checked_calls_v8 import resolve_entry_segments

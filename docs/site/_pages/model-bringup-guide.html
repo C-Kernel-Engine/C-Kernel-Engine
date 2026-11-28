@@ -1640,6 +1640,25 @@ python3 version/v8/scripts/export_llama_hidden_v8.py \
      Allow about 12 GiB of additional available RAM for the weight-backed replay.</p>
   <pre><code>python -m pytest -q tests/test_v8_sigma_bf16_denoiser_stack.py</code></pre>
 
+  <h3 id="sigma-cache-continuation">Sigma-3B BF16 cache continuation</h3>
+  <p>The fixed-noise replay loads one weight arena and binds three generated entries for
+     clean prefill, clean append, and a guided DDPM step. The denoiser and append
+     entries read the valid BF16 cache rows and the current block through two
+     explicit attention ranges. They use absolute positions and exclude unused
+     cache capacity. The native session publishes the staged K/V rows, cache
+     length, and block IDs after successful evaluation. Rejection and cancellation
+     preserve the last committed state.</p>
+  <p>Use the same checkpoint and LP64 BLAS settings as the denoiser replay above.
+     Allow about 22 GiB of available memory for the weight-backed test.</p>
+  <pre><code>python -m pytest -q tests/test_v8_sigma_native_session.py</code></pre>
+  <p>The Ryzen fixture extends a six-token prompt with two three-token blocks.
+     All 24 conditional token selections match the independent PyTorch calculation.
+     For the second block, maximum latent trajectory error is 0.00480 and maximum
+     appended K/V error is 0.09375. Resetting the prompt and repeating both blocks
+     through direct native dispatch reproduces the token IDs and cache bit for bit.
+     The replay uses compiled prompt and block widths, a single-owner arena,
+     and supplied noise.</p>
+
   <h2 id="xray-diagnosis">11. Diagnose divergence with X-Ray</h2>
   <p>When parity fails, do not poke at tolerances. Walk the decision tree &mdash; each branch names an owner, and the fix lands in that owner's artifact (see <a href="xray.html">the X-Ray page</a> for the full evidence model and capture-neutrality gates):</p>
   <div class="mb-table"><table><thead><tr><th>Observation</th><th>Diagnosis</th><th>Repair</th></tr></thead><tbody>
