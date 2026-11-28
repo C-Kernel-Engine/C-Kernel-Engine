@@ -1267,7 +1267,7 @@ insufficient. PDF rasterization and its page/pixel limits belong to a separate f
 
 <h2>Inventory boundary</h2>
 <p><code>qwen35</code>, <code>qwen38</code>, <code>instella_moe</code>, and <code>nemotron_h</code> are text/recurrent circuits in this inventory. Their text compatibility does not certify a vision encoder. An exact vision-capable artifact and a connected CKE path must be identified before adding a numerical verdict for them.</p>
-<p><strong>Nemotron Nano 12B v2 VL BF16: generated fixed-tile projector.</strong>
+<p><strong>Nemotron Nano 12B v2 VL: generated fixed-tile image path.</strong>
 The checked generated gather reproduces the publisher's v2 patch packing for one 512-pixel
 tile: 1024 spatial RADIO rows of width 1280 become 256 projector rows of width 5120, without
 changing BF16 storage bits. Generated C then runs weighted RMSNorm, bias-free expansion,
@@ -1275,9 +1275,18 @@ squared ReLU, and bias-free projection with BF16 stores. On one public image, a 
 reconstruction provided the same spatial input to both projectors. With the publisher weights
 and the opt-in CBLAS provider, final embeddings differed from PyTorch by RMSE 0.000229 and maximum
 absolute error 0.03125. This is a diagnostic, not a declared numerical acceptance result.
-Native RADIO execution, the 12B decoder bridge and HTTP serving remain open. This does not
-change the capability of the text-only 9B bundle.
+The offline host now executes the patch projection and all 32 RADIO blocks in generated C,
+with publisher BF16 weights widened to FP32 and FP32 intermediate activations. Two public
+color fixtures had encoder feature RMSE 0.0231 and 0.0287 against the retained BF16 PyTorch
+reconstruction. The generated projector feeds the generated 12B Q4_K_M decoder with 256 image
+rows inside the publisher's image markers. It gave the expected color on both public fixtures
+and stopped normally. This does not certify BF16 encoder parity,
+dynamic tiling, OCR quality, or HTTP and harness support. It does not change the capability
+of the text-only 9B bundle.
 <a href="https://huggingface.co/nvidia/NVIDIA-Nemotron-Nano-12B-v2-VL-BF16/blob/ca9543b126e8bf3176916d3d305ccc415f89fd4d/modeling.py">Publisher implementation</a>.</p>
+<p><strong>Nemotron 3 Nano Omni: not supported by this path.</strong> Its C-RADIOv4-H encoder,
+dynamic image geometry, and 2688-wide language bridge require a separate checked artifact contract.
+<a href="https://docs.nvidia.com/nemotron/nightly/nemotron/omni3/architecture.html">Publisher architecture</a>.</p>
 
 <h2>Next acceptance gate</h2>
 <p class="vision-status-next">For Gemma4, freeze the already compared visual prefix and forced tokens. Replay the first differing decoder operation on identical operands, distinguishing the first observed attention-output mismatch from a proven local cause. After a justified fix, rerun shared-prefix logits, independent-prefix logits, and scored image answers separately. Keep <a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/issues/851">the tracking issue</a> open until one exact artifact completes the image-to-answer and live-serving gates.</p>
