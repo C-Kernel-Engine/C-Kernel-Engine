@@ -778,6 +778,10 @@ TEST_SUITES = {
         "TTS Kokoro Extent and Duration Expansion", "kernels",
         ROOT / "tests" / "test_v8_kokoro_shape_bounds.py",
     ),
+    "tts_phonon31m_codec_ingress": TestSuite(
+        "Phonon 31M Generated Mimi Codec Ingress", "inference",
+        ROOT / "tests" / "test_v8_phonon31m_codec_ingress.py", pytest=True,
+    ),
     "tts_drama3_codec_rvq": TestSuite(
         "Drama 3 Generated Semantic and Residual Codebook Reconstruction", "inference",
         ROOT / "tests" / "test_v8_drama3_codec_rvq.py", pytest=True,
