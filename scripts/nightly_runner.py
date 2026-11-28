@@ -2245,6 +2245,12 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_nemotron_vl_projector_input.py",
         timeout_sec=120,
     ),
+    "v8_nemotron_vl_projector": TestSuite(
+        "Nemotron VL Generated Weighted Projector",
+        "parity",
+        ROOT / "tests" / "test_v8_nemotron_vl_projector.py",
+        timeout_sec=120,
+    ),
     "v8_hidden_export_extents": TestSuite(
         "Generated Hidden Export Extents",
         "parity",

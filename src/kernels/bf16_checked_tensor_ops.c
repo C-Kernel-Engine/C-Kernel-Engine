@@ -79,6 +79,29 @@ int ck_widen_bf16_checked(const uint16_t *input, float *out, size_t elements)
     return 0;
 }
 
+int ck_relu2_bf16_checked(const uint16_t *input, uint16_t *out,
+                          float *stage, size_t elements)
+{
+    if (!elements || !valid_span(input, elements, 2) ||
+        !valid_span(out, elements, 2) || !valid_span(stage, elements, 4))
+        return -2;
+    const size_t bytes = elements * sizeof(*input);
+    const size_t stage_bytes = elements * sizeof(*stage);
+    if (overlaps(input, bytes, out, bytes) || overlaps(input, bytes, stage, stage_bytes) ||
+        overlaps(out, bytes, stage, stage_bytes))
+        return -2;
+    for (size_t i = 0; i < elements; ++i) {
+        const float x = bf16_to_float(input[i]);
+        const float positive = x > 0.0f ? x : 0.0f;
+        stage[i] = positive * positive;
+        if (!isfinite(x) || !isfinite(bf16_to_float(float_to_bf16(stage[i]))))
+            return -3;
+    }
+    for (size_t i = 0; i < elements; ++i)
+        out[i] = float_to_bf16(stage[i]);
+    return 0;
+}
+
 static int gated_bf16(const uint16_t *gate, const uint16_t *up, uint16_t *out,
                       float *stage, size_t n, void (*activate)(float *, size_t))
 {

@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 597,
+      "total": 598,
       "by_op": {
         "add_backward": 1,
         "add_bf16_checked": 1,
@@ -215,6 +215,7 @@
         "recurrent_split_qkv": 1,
         "recurrent_split_qkv_backward": 1,
         "relu2": 2,
+        "relu2_bf16_checked": 1,
         "repetition_penalty_last_row_checked": 1,
         "residual_add": 2,
         "residual_save": 1,
@@ -98350,6 +98351,149 @@
       },
       "name": "relu2_backward_f32",
       "_source_file": "relu2_backward.json"
+    },
+    {
+      "id": "relu2_bf16_checked",
+      "op": "relu2_bf16_checked",
+      "operation_interface": "tensor.relu2_bf16_checked.v1",
+      "variant": "fp32_square_single_bf16_store",
+      "quant": {
+        "weight": "none",
+        "activation": "bf16",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "output",
+          "consumption": "required"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "stage",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "size_bytes": "4 * N",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64
+        }
+      ],
+      "dims": [
+        "N"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_relu2_bf16_checked",
+        "c_declaration": "int ck_relu2_bf16_checked(const uint16_t *input, uint16_t *out, float *stage, size_t elements);",
+        "sources": [
+          "src/kernels/bf16_checked_tensor_ops.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "out",
+            "source": "output:out",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "stage",
+            "source": "scratch:stage",
+            "cast": "float*"
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "out",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "stage",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_nemotron_vl_projector.py"
+        ]
+      },
+      "notes": "Disjoint input, output and scratch. Squared positive part in FP32, single BF16 RNE store. Nonfinite input or output leaves output unchanged.",
+      "name": "relu2_bf16_checked",
+      "_source_file": "relu2_bf16_checked.json"
     },
     {
       "id": "relu2_forward",
