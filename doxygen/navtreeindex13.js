@@ -1,5 +1,11 @@
 var NAVTREEINDEX13 =
 {
+"decision__scoring__backward_8c.html#aab7b59b69b3b07d80a37da04cd18e7df":[2,0,1,1,49,2],
+"decision__scoring__backward_8c.html#aba5c54fadff8d880b1945dde87496e31":[2,0,1,1,49,1],
+"decision__scoring__backward_8c.html#ac13c666d0c4ac54d0841e05e4c1f54f6":[2,0,1,1,49,11],
+"decision__scoring__backward_8c.html#ac5a786a92d3282c182af8e7778385a96":[2,0,1,1,49,5],
+"decision__scoring__backward_8c.html#aff1b09d6630c6c0942f78171e74c1b9d":[2,0,1,1,49,0],
+"decision__scoring__backward_8c_source.html":[2,0,1,1,49],
 "decision__tensor__ops_8c.html":[2,0,1,1,50],
 "decision__tensor__ops_8c.html#a3b0f37e61a34f1e54a900bdf137a0484":[2,0,1,1,50,1],
 "decision__tensor__ops_8c.html#a455abd42d7d4b5a968634525610bdb7b":[2,0,1,1,50,8],
@@ -243,11 +249,5 @@ var NAVTREEINDEX13 =
 "functions_u.html":[1,2,0,19],
 "functions_v.html":[1,2,0,20],
 "functions_vars.html":[1,2,1],
-"functions_vars.html":[1,2,1,0],
-"functions_vars_b.html":[1,2,1,1],
-"functions_vars_c.html":[1,2,1,2],
-"functions_vars_d.html":[1,2,1,3],
-"functions_vars_e.html":[1,2,1,4],
-"functions_vars_f.html":[1,2,1,5],
-"functions_vars_g.html":[1,2,1,6]
+"functions_vars.html":[1,2,1,0]
 };

@@ -129,11 +129,12 @@ var NAVTREEINDEX6 =
 "ckernel__checked__diffusion__schedule_8h.html#a8a52b64935e7e0f5d2e21c3a1c942966":[2,0,0,30,2],
 "ckernel__checked__diffusion__schedule_8h_source.html":[2,0,0,30],
 "ckernel__checked__diffusion__session_8h.html":[2,0,0,31],
-"ckernel__checked__diffusion__session_8h.html#a363d8f532e6e4a95c1fb910117de07f3":[2,0,0,31,7],
-"ckernel__checked__diffusion__session_8h.html#a3a5acfce1766e736e18ab0ed3452de39":[2,0,0,31,8],
-"ckernel__checked__diffusion__session_8h.html#ae15969ee11f7f7f93a3f4f839ee109e8":[2,0,0,31,4],
-"ckernel__checked__diffusion__session_8h.html#aebe677da63918f606f2d9104d02c4471":[2,0,0,31,5],
-"ckernel__checked__diffusion__session_8h.html#afd1bd01476957165fe359dbd75d71957":[2,0,0,31,6],
+"ckernel__checked__diffusion__session_8h.html#a363d8f532e6e4a95c1fb910117de07f3":[2,0,0,31,8],
+"ckernel__checked__diffusion__session_8h.html#a3a5acfce1766e736e18ab0ed3452de39":[2,0,0,31,10],
+"ckernel__checked__diffusion__session_8h.html#ad7abe7dae35505ae36bccce4aa60091a":[2,0,0,31,9],
+"ckernel__checked__diffusion__session_8h.html#ae15969ee11f7f7f93a3f4f839ee109e8":[2,0,0,31,5],
+"ckernel__checked__diffusion__session_8h.html#aebe677da63918f606f2d9104d02c4471":[2,0,0,31,6],
+"ckernel__checked__diffusion__session_8h.html#afd1bd01476957165fe359dbd75d71957":[2,0,0,31,7],
 "ckernel__checked__diffusion__session_8h_source.html":[2,0,0,31],
 "ckernel__checked__frame__codec_8h.html":[2,0,0,32],
 "ckernel__checked__frame__codec_8h.html#a1a2fa4a049badc1d2d52f7103c6c76db":[2,0,0,32,5],
@@ -248,6 +249,5 @@ var NAVTREEINDEX6 =
 "ckernel__codegen__v6_85_8c.html#a120f32d0bd6569e3d76d63823e442b93":[2,0,1,7,4,3],
 "ckernel__codegen__v6_85_8c.html#a1e4c00df57df3f0cef59922cf24cfeb6":[2,0,1,7,4,14],
 "ckernel__codegen__v6_85_8c.html#a24b2b8f653da6dae7046fcc819cb1ff0":[2,0,1,7,4,6],
-"ckernel__codegen__v6_85_8c.html#a3478c5c741c441ba7f4aca0dd4007558":[2,0,1,7,4,20],
-"ckernel__codegen__v6_85_8c.html#a44da171956824603104927a1c1af8516":[2,0,1,7,4,15]
+"ckernel__codegen__v6_85_8c.html#a3478c5c741c441ba7f4aca0dd4007558":[2,0,1,7,4,20]
 };

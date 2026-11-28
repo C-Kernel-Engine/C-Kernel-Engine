@@ -26,6 +26,7 @@ var annotated_dup =
     [ "ck_diffusion_cache_plane", "structck__diffusion__cache__plane.html", "structck__diffusion__cache__plane" ],
     [ "ck_diffusion_clean_entry", "structck__diffusion__clean__entry.html", "structck__diffusion__clean__entry" ],
     [ "ck_diffusion_schedule_request", "structck__diffusion__schedule__request.html", "structck__diffusion__schedule__request" ],
+    [ "ck_diffusion_seeded_request", "structck__diffusion__seeded__request.html", "structck__diffusion__seeded__request" ],
     [ "ck_diffusion_session", "structck__diffusion__session.html", "structck__diffusion__session" ],
     [ "ck_diffusion_step_bindings", "structck__diffusion__step__bindings.html", "structck__diffusion__step__bindings" ],
     [ "ck_flow_model", "structck__flow__model.html", "structck__flow__model" ],

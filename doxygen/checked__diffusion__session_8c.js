@@ -4,6 +4,7 @@ var checked__diffusion__session_8c =
     [ "cancelled", "checked__diffusion__session_8c.html#a0e6b17e42204d8edc87d6b2222a03cfa", null ],
     [ "ck_append_diffusion_session", "checked__diffusion__session_8c.html#afd1bd01476957165fe359dbd75d71957", null ],
     [ "ck_generate_diffusion_block", "checked__diffusion__session_8c.html#ae830e22392af15ac7f0544ec97673082", null ],
+    [ "ck_generate_seeded_diffusion", "checked__diffusion__session_8c.html#a1a7bf33202378b758dc197025004340f", null ],
     [ "ck_prefill_diffusion_session", "checked__diffusion__session_8c.html#a3a5acfce1766e736e18ab0ed3452de39", null ],
     [ "disjoint", "checked__diffusion__session_8c.html#a50eea599359de6551bc97ecb605e1302", null ],
     [ "encode_clean", "checked__diffusion__session_8c.html#aa1a9b3c818711f673ae773f3f6e7be0e", null ],
