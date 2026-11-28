@@ -97,9 +97,10 @@ var searchData=
   ['vocabulary_5fsize_94',['vocabulary_size',['../structCKDecoderFeatures.html#ab304219bf87b0d271ffdd9ab9b26db8c',1,'CKDecoderFeatures']]],
   ['void_5ffunc_5ft_95',['void_func_t',['../ck__cli__v5_8c.html#a2425c2b3462f867da9fd2ab76d9d47b1',1,'void_func_t:&#160;ck_cli_v5.c'],['../ck__cli__v6_8c.html#a2425c2b3462f867da9fd2ab76d9d47b1',1,'void_func_t:&#160;ck_cli_v6.c']]],
   ['vp_5fblend_96',['vp_blend',['../diffusion__vp__step_8c.html#ace48aad3efe5a4a457c27acdc64244c1',1,'diffusion_vp_step.c']]],
-  ['vp_5foverlaps_97',['vp_overlaps',['../diffusion__vp__step_8c.html#a254b0f2e76181c73f94422cef68e7113',1,'diffusion_vp_step.c']]],
-  ['vp_5fregion_5fvalid_98',['vp_region_valid',['../diffusion__vp__step_8c.html#a2ca9765b46a02750d8b2debad8c1f37f',1,'diffusion_vp_step.c']]],
-  ['vp_5fsigmoid_99',['vp_sigmoid',['../diffusion__vp__common_8h.html#ac33c08aa7f3cd36db1fd04352826b48b',1,'diffusion_vp_common.h']]],
-  ['vsexp_100',['vsexp',['../deltanet__chunked__bf16_8c.html#a1fa72e6a19202f986c8ed7f84b719f0e',1,'deltanet_chunked_bf16.c']]],
-  ['vsexp_5ffn_101',['vsexp_fn',['../deltanet__chunked__bf16_8c.html#a951fd0587b3300c95e2782320da293c4',1,'deltanet_chunked_bf16.c']]]
+  ['vp_5fddim_5fvalue_97',['vp_ddim_value',['../diffusion__vp__step_8c.html#af90e0bc59b90c14d74a0afb1a5f8cd29',1,'diffusion_vp_step.c']]],
+  ['vp_5foverlaps_98',['vp_overlaps',['../diffusion__vp__step_8c.html#a254b0f2e76181c73f94422cef68e7113',1,'diffusion_vp_step.c']]],
+  ['vp_5fregion_5fvalid_99',['vp_region_valid',['../diffusion__vp__step_8c.html#a2ca9765b46a02750d8b2debad8c1f37f',1,'diffusion_vp_step.c']]],
+  ['vp_5fsigmoid_100',['vp_sigmoid',['../diffusion__vp__common_8h.html#ac33c08aa7f3cd36db1fd04352826b48b',1,'diffusion_vp_common.h']]],
+  ['vsexp_101',['vsexp',['../deltanet__chunked__bf16_8c.html#a1fa72e6a19202f986c8ed7f84b719f0e',1,'deltanet_chunked_bf16.c']]],
+  ['vsexp_5ffn_102',['vsexp_fn',['../deltanet__chunked__bf16_8c.html#a951fd0587b3300c95e2782320da293c4',1,'deltanet_chunked_bf16.c']]]
 ];

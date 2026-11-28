@@ -1,5 +1,13 @@
 var NAVTREEINDEX25 =
 {
+"structCacheInfo.html":[1,0,10],
+"structCacheInfo.html#a2bbafb632144b03c4ac4d74fea63b438":[1,0,10,0],
+"structCacheInfo.html#a2d480cc7cf9fcab61720174ffad45770":[1,0,10,4],
+"structCacheInfo.html#a6998f8578822bdc01a41f3a9d695e7ac":[1,0,10,1],
+"structCacheInfo.html#a9ad45f782f3a898bbd3848b8a5f52d83":[1,0,10,5],
+"structCacheInfo.html#aefdbeadd9d601084c823c530a35e4e5c":[1,0,10,2],
+"structCacheInfo.html#af0d7fd2b3b6d58a409f2e91419970a87":[1,0,10,3],
+"structCacheTopology.html":[1,0,11],
 "structCacheTopology.html#a312d10896e318962d7a948eb04aaddd0":[1,0,11,1],
 "structCacheTopology.html#a7d8f011d2962b633861d25e320df4d7b":[1,0,11,2],
 "structCacheTopology.html#aad6fb272149cb50628325bed91adfa37":[1,0,11,0],
@@ -241,13 +249,5 @@ var NAVTREEINDEX25 =
 "structck__checked__frame__codec.html#a4dbced71f17c455bfccc0f8bc84d87f4":[1,0,15,4],
 "structck__checked__frame__codec.html#a4e50ba44c69ab292085480dc55156073":[1,0,15,5],
 "structck__checked__frame__codec.html#a525397cbefeaaaba47f1c41e073a6baf":[1,0,15,9],
-"structck__checked__frame__codec.html#a5e4197c8d4353e695277e01cf11e693f":[1,0,15,10],
-"structck__checked__frame__codec.html#a7b779d608bc0f128e3a6dccb1bb53fbe":[1,0,15,3],
-"structck__checked__frame__codec.html#ab2d98e2f4402d557c3e66cbaa2eb2b40":[1,0,15,8],
-"structck__checked__frame__codec.html#abf023a954f0a41bd2b9cc36e0ebb1a3a":[1,0,15,6],
-"structck__checked__frame__codec.html#acf1afbbff43adfe1fb1f8a1323dd2acb":[1,0,15,1],
-"structck__checked__frame__codec.html#aeab16e33be7da415cd7e457605df9daf":[1,0,15,0],
-"structck__checked__frame__codec.html#af55cf19d75b7b8dec7496d6be62396e2":[1,0,15,2],
-"structck__checked__frame__codec__prefix.html":[1,0,16],
-"structck__checked__frame__codec__prefix.html#a0997294a8100424e872a676170318e90":[1,0,16,1]
+"structck__checked__frame__codec.html#a5e4197c8d4353e695277e01cf11e693f":[1,0,15,10]
 };

@@ -1674,8 +1674,47 @@ python3 version/v8/scripts/export_llama_hidden_v8.py \
   <p>The same test command exercises seeded generation and replays CKE's
      exact samples in an independent PyTorch comparison. RNG repeatability is
      scoped to the same build and math library. The token-level entry uses
-     a fixed budget. Text tokenization, EOS behavior, and serving require
-     separate acceptance tests.</p>
+     a fixed budget. The text harness below adds tokenization and delimiter
+     stopping over that interface.</p>
+
+  <h4 id="sigma-text-harness">Sigma-3B BF16 text harness</h4>
+  <p>Use the pinned Sigma-3B snapshot at revision
+     <code>7eff02e0b72dace46d9084430330c192bf5a4386</code>. The harness verifies
+     the configuration, tokenizer, index, and weight shards. It prepares
+     weights with PyTorch and safetensors at startup, then uses the tokenizer
+     and the generated native session for each request. One process loads
+     one arena and takes one request at a time. Install
+     <code>tokenizers</code> alongside the repository requirements.</p>
+  <pre><code>export CK_BLAS_LIBRARY=/absolute/path/to/lp64-blas.so
+export OMP_NUM_THREADS=8 MKL_NUM_THREADS=8 OPENBLAS_NUM_THREADS=8
+python -m version.v8.scripts.run_sigma_text_v8 \
+  --checkpoint /path/to/sigma3b --threads 8 --seed 41 \
+  --prompt 'The capital of France is' --stop '.' --json</code></pre>
+  <p>Omit <code>--prompt</code> for the REPL, or repeat it to run several
+     requests on the same bundle. Enter <code>:quit</code> to exit. During
+     generation, Ctrl+C cancels at a native step boundary and returns to
+     the REPL. The budget is a whole number of blocks and must fit in the
+     cache with the prompt. Prompt length is bounded by
+     <code>--prompt-capacity</code>. Delimiters are checked between committed
+     blocks and trimmed from the displayed completion. JSON preserves the
+     raw committed token IDs and reports the stopping reason. Use
+     <code>--chat</code> to render each prompt as a single user turn with
+     the verified publisher template. This mode requires <code>jinja2</code>
+     and accepts an optional <code>--system</code> message.</p>
+  <p>The default text profile uses the publisher's 32-token blocks,
+     32 DDIM transitions on the checkpoint's linear VP gamma grid, guidance
+     3.0, score temperature 0.3, and final argmax. The runtime draws only an
+     initial latent per DDIM block. For a shorter CPU smoke test, add
+     <code>--sampler ddpm --block 8 --budget 8 --steps 16 --guidance 1</code>.
+     Use <code>--build-root</code> to retain the generated C, binding manifest,
+     and native library. The default budget is 32 tokens. Requests start
+     with a fresh prompt and stop on text delimiters or the budget.</p>
+  <p>Run the bounded generated and pinned comparisons with the same checkpoint
+     and BLAS settings as the cache replay. The pinned DDIM test compares
+     the FP64 transition on the same operands and compares conditional IDs
+     across same-seed independent PyTorch trajectories. The report includes
+     the latent drift across the two BF16 model executions.</p>
+  <pre><code>python -m pytest -q -rs tests/test_v8_sigma_native_session.py</code></pre>
 
   <h2 id="xray-diagnosis">11. Diagnose divergence with X-Ray</h2>
   <p>When parity fails, do not poke at tolerances. Walk the decision tree &mdash; each branch names an owner, and the fix lands in that owner's artifact (see <a href="xray.html">the X-Ray page</a> for the full evidence model and capture-neutrality gates):</p>

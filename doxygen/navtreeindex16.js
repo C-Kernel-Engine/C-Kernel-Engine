@@ -1,5 +1,13 @@
 var NAVTREEINDEX16 =
 {
+"gemm__kernels__q5__0_8c.html#ae8f7ef45b1d165688f611a3d5549c61d":[2,0,1,1,88,21],
+"gemm__kernels__q5__0_8c.html#aee47f9f121aea7c4dfc09cd0f3d24c26":[2,0,1,1,88,23],
+"gemm__kernels__q5__0_8c_source.html":[2,0,1,1,88],
+"gemm__kernels__q5__0__sse_8c.html":[2,0,1,1,89],
+"gemm__kernels__q5__0__sse_8c.html#adb170e90448ee93b66c6684ba7768178":[2,0,1,1,89,0],
+"gemm__kernels__q5__0__sse_8c_source.html":[2,0,1,1,89],
+"gemm__kernels__q5__0__sse__v2_8c.html":[2,0,1,1,90],
+"gemm__kernels__q5__0__sse__v2_8c.html#a00a143b1495811557d83661c637ba3a6":[2,0,1,1,90,2],
 "gemm__kernels__q5__0__sse__v2_8c.html#a64b28ca8a25883986a0d22e39a574a32":[2,0,1,1,90,3],
 "gemm__kernels__q5__0__sse__v2_8c.html#aa25694bd7b677f5b945be6f5dbdaa9c9":[2,0,1,1,90,1],
 "gemm__kernels__q5__0__sse__v2_8c.html#afb621aff9a12017b33347eb42473baf7":[2,0,1,1,90,0],
@@ -241,13 +249,5 @@ var NAVTREEINDEX16 =
 "gemv__omp_8h_source.html":[2,0,1,1,102],
 "ggml__runtime__compat_8h.html":[2,0,1,1,103],
 "ggml__runtime__compat_8h.html#a1857759a96cc702d26bc089d14e4b268":[2,0,1,1,103,7],
-"ggml__runtime__compat_8h.html#a1bc4501bf626065c2b379dbea4cc1ce6":[2,0,1,1,103,8],
-"ggml__runtime__compat_8h.html#a1e1b82250cb90231ee164367d2171684":[2,0,1,1,103,2],
-"ggml__runtime__compat_8h.html#a25b8976b70962cc9b52c3508eda235ad":[2,0,1,1,103,5],
-"ggml__runtime__compat_8h.html#a25b8976b70962cc9b52c3508eda235ada2ca89f294003a9d508d32dd79087223c":[2,0,1,1,103,5,2],
-"ggml__runtime__compat_8h.html#a25b8976b70962cc9b52c3508eda235ada80fe0445773a0394a2792a9726971121":[2,0,1,1,103,5,0],
-"ggml__runtime__compat_8h.html#a25b8976b70962cc9b52c3508eda235adaa6be8964844007105224d4cafc3ff7c9":[2,0,1,1,103,5,3],
-"ggml__runtime__compat_8h.html#a25b8976b70962cc9b52c3508eda235adad304e0b5bcd4b5533a6ccb3c303e6510":[2,0,1,1,103,5,1],
-"ggml__runtime__compat_8h.html#a4137501de39b1fe78c0b3e1c19eb0f98":[2,0,1,1,103,1],
-"ggml__runtime__compat_8h.html#a601933f49e5ffd465b06738c056e30e3":[2,0,1,1,103,11]
+"ggml__runtime__compat_8h.html#a1bc4501bf626065c2b379dbea4cc1ce6":[2,0,1,1,103,8]
 };

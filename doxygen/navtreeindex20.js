@@ -1,5 +1,13 @@
 var NAVTREEINDEX20 =
 {
+"recurrent__qk__norm__kernels_8c.html":[2,0,1,1,147],
+"recurrent__qk__norm__kernels_8c.html#a0dd8cd71bd25ed57393abeea5eeec5c4":[2,0,1,1,147,1],
+"recurrent__qk__norm__kernels_8c.html#a1594cff75d6dc9fe6836555230b1b7cb":[2,0,1,1,147,11],
+"recurrent__qk__norm__kernels_8c.html#a1f8ded1d8bc4b06c825aceb06df8bbed":[2,0,1,1,147,10],
+"recurrent__qk__norm__kernels_8c.html#a259410cd2b892b43fbdfe309cf0103aa":[2,0,1,1,147,8],
+"recurrent__qk__norm__kernels_8c.html#a3db433fc055482ec19e14c60e3a89da6":[2,0,1,1,147,3],
+"recurrent__qk__norm__kernels_8c.html#a40128a284c7fe062bf4c3ecad6d2d4ea":[2,0,1,1,147,9],
+"recurrent__qk__norm__kernels_8c.html#a49eb6edcdcc1b513ab60cc3a0917ef60":[2,0,1,1,147,6],
 "recurrent__qk__norm__kernels_8c.html#a93bfaa20cdf99a99fcf3fef56d39cd27":[2,0,1,1,147,2],
 "recurrent__qk__norm__kernels_8c.html#ac4af9b8924cf11e95ce1d4cbbf4e8d51":[2,0,1,1,147,7],
 "recurrent__qk__norm__kernels_8c.html#ae182c505e61bbb6f2020f85ace607561":[2,0,1,1,147,5],
@@ -241,13 +249,5 @@ var NAVTREEINDEX20 =
 "routed__softcapped__experts__checked_8c.html#a5aba59535fd2de2ff99d3d738a0ce522":[2,0,1,1,162,28],
 "routed__softcapped__experts__checked_8c.html#a5acb7fd77f8360bb90d12da515fa7024":[2,0,1,1,162,35],
 "routed__softcapped__experts__checked_8c.html#a5bcbaa857f542bb03d7018e5563a3e58":[2,0,1,1,162,16],
-"routed__softcapped__experts__checked_8c.html#a69daa9a9c8e37d3f4125e6bee67141f9":[2,0,1,1,162,46],
-"routed__softcapped__experts__checked_8c.html#a6a5e7dbccefdf9510496dd97e41ac5ef":[2,0,1,1,162,44],
-"routed__softcapped__experts__checked_8c.html#a6abea59d88c3c9a752719519301cea7a":[2,0,1,1,162,15],
-"routed__softcapped__experts__checked_8c.html#a6c87d8ca90c32d72b8b681d4374a90db":[2,0,1,1,162,12],
-"routed__softcapped__experts__checked_8c.html#a7574aa1207792345ea8d241703e85fa4":[2,0,1,1,162,13],
-"routed__softcapped__experts__checked_8c.html#a758294907bcff076dc11a0ff1a2e7e5f":[2,0,1,1,162,9],
-"routed__softcapped__experts__checked_8c.html#a78bef41d8a383bd87e23e1d12e0c0ee1":[2,0,1,1,162,47],
-"routed__softcapped__experts__checked_8c.html#a790796075bcdbe5496fe300109a63e5f":[2,0,1,1,162,45],
-"routed__softcapped__experts__checked_8c.html#a7940c190594bcb33003368a6a08490ef":[2,0,1,1,162,8]
+"routed__softcapped__experts__checked_8c.html#a69daa9a9c8e37d3f4125e6bee67141f9":[2,0,1,1,162,46]
 };
