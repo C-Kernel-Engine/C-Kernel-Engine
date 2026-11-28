@@ -1,4 +1,5 @@
 #include "ckernel_checked_diffusion_session.h"
+#include "ckernel_counter_gaussian.h"
 
 #include <math.h>
 #include <string.h>
@@ -55,9 +56,7 @@ static int valid_session(const ck_diffusion_session *s)
         s->block_rows > (size_t)INT32_MAX - s->capacity || s->prompt_rows > s->capacity ||
         s->block_rows > s->capacity - s->prompt_rows || s->capacity > SIZE_MAX / s->kv_width ||
         s->prompt_rows > SIZE_MAX / 4 || s->block_rows > SIZE_MAX / 4 ||
-        s->valid_rows > s->capacity ||
-        (s->valid_rows && (s->valid_rows < s->prompt_rows ||
-                          (s->valid_rows - s->prompt_rows) % s->block_rows)))
+        s->valid_rows > s->capacity)
         return 0;
 
     span arena, bindings, state;
@@ -127,7 +126,7 @@ static int encode_clean(ck_diffusion_session *s, const int32_t *ids, size_t rows
     const ck_diffusion_clean_entry *entry = reset ? &s->prefill : &s->append;
     const size_t prefix = reset ? 0 : s->valid_rows;
     span tokens;
-    if (rows != (reset ? s->prompt_rows : s->block_rows) ||
+    if ((reset ? rows > s->prompt_rows : rows != s->block_rows) ||
         rows > s->capacity - prefix || (!reset && !prefix) ||
         !region(&tokens, ids, rows, sizeof(*ids)) || !external(s, tokens))
         return -1;
@@ -135,7 +134,13 @@ static int encode_clean(ck_diffusion_session *s, const int32_t *ids, size_t rows
         if (ids[i] < 0 || (size_t)ids[i] >= s->vocabulary) return -1;
     if (cancelled(cancel, context)) return -7;
     memcpy(s->arena + entry->token_ids, ids, rows * sizeof(*ids));
-    bind_visibility(s->arena, prefix, reset ? 0 : s->capacity, rows, 1, entry->positions, entry->ranges);
+    const size_t compiled_rows = reset ? s->prompt_rows : s->block_rows;
+    memset(s->arena + entry->token_ids + rows * sizeof(*ids), 0,
+           (compiled_rows - rows) * sizeof(*ids));
+    /* Clean attention is causal. Padding can read the live prefix, but
+     * live rows cannot read padding, and only live K/V rows are committed. */
+    bind_visibility(s->arena, prefix, reset ? 0 : s->capacity, compiled_rows, 1,
+                    entry->positions, entry->ranges);
     const int status = entry->entry(s->arena, s->arena_bytes);
     if (status) return status;
     if (cancelled(cancel, context)) return -7;
@@ -209,5 +214,58 @@ int ck_generate_diffusion_block(ck_diffusion_session *s, const ck_diffusion_bloc
     status = encode_clean(s, r->staged_ids, s->block_rows, 0, r->should_cancel, r->cancel_context);
     if (status) return status;
     memcpy(r->output_ids, r->staged_ids, s->block_rows * sizeof(int32_t));
+    return 0;
+}
+
+int ck_generate_seeded_diffusion(ck_diffusion_session *s, ck_diffusion_seeded_request *r)
+{
+    if (!r || (uintptr_t)r % _Alignof(ck_diffusion_seeded_request) || !valid_session(s) ||
+        !r->prompt_rows || r->prompt_rows > s->prompt_rows ||
+        !r->token_budget || r->token_budget % s->block_rows ||
+        r->token_budget > s->capacity - r->prompt_rows || r->output_capacity < r->token_budget ||
+        r->schedule_count < 2 || s->latent_elements > SIZE_MAX / sizeof(double) / r->schedule_count ||
+        !isfinite(r->guidance) || r->staged_capacity < s->block_rows)
+        return -1;
+    const size_t n = s->latent_elements;
+    const size_t samples = n * r->schedule_count;
+    if (r->workspace_elements < samples) return -1;
+    span operands[6];
+    if (!region(&operands[0], r, sizeof(*r), 1) ||
+        !region(&operands[1], r->prompt_ids, r->prompt_rows, sizeof(int32_t)) ||
+        !region(&operands[2], r->schedule, r->schedule_count, sizeof(double)) ||
+        !region(&operands[3], r->workspace, r->workspace_elements, sizeof(double)) ||
+        !region(&operands[4], r->staged_ids, r->staged_capacity, sizeof(int32_t)) ||
+        !region(&operands[5], r->output_ids, r->output_capacity, sizeof(int32_t)))
+        return -1;
+    for (size_t i = 0; i < sizeof operands / sizeof operands[0]; ++i) {
+        if (!external(s, operands[i])) return -1;
+        for (size_t j = 0; j < i; ++j)
+            if (!disjoint(operands[i], operands[j])) return -1;
+    }
+    for (size_t i = 0; i < r->schedule_count; ++i)
+        if (!isfinite(r->schedule[i]) || (i && r->schedule[i] >= r->schedule[i - 1])) return -1;
+    for (size_t i = 0; i < r->prompt_rows; ++i)
+        if (r->prompt_ids[i] < 0 || (size_t)r->prompt_ids[i] >= s->vocabulary) return -1;
+
+    r->generated_rows = 0;
+    int status = encode_clean(s, r->prompt_ids, r->prompt_rows, 1, r->should_cancel, r->cancel_context);
+    if (status) return status;
+
+    ck_diffusion_block_request block = {
+        .latent = r->workspace, .schedule = r->schedule, .noise = r->workspace + n,
+        .latent_elements = n, .schedule_count = r->schedule_count, .noise_elements = samples - n,
+        .guidance = r->guidance, .staged_ids = r->staged_ids, .staged_capacity = r->staged_capacity,
+        .output_capacity = s->block_rows, .should_cancel = r->should_cancel, .cancel_context = r->cancel_context,
+    };
+    while (r->generated_rows < r->token_budget) {
+        if (cancelled(r->should_cancel, r->cancel_context)) return -7;
+        const uint64_t domain = ck_rng_gaussian_domain(r->seed, r->generated_rows / s->block_rows);
+        for (size_t i = 0; i < samples; ++i)
+            r->workspace[i] = ck_rng_gaussian_f64(domain, i);
+        block.output_ids = r->output_ids + r->generated_rows;
+        status = ck_generate_diffusion_block(s, &block);
+        if (status) return status;
+        r->generated_rows += s->block_rows;
+    }
     return 0;
 }
