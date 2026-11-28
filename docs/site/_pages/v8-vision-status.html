@@ -305,6 +305,19 @@ prose, and reports accepted fields in <code>data</code>. The original <code>text
 The public cheque, receipt and checkbox fixtures have captured answers and field-level expected
 values for portable client regressions. Replaying those captures tests parsing and validation,
 not a new model run. The earlier live run got all 15 fields right, but all three answers used fences.</p>
+<h3>Interactive image REPL</h3>
+<pre><code>python -m scripts.vision_repl --model nemotron-nano-vl --approved-root ./images
+&gt; /image form.png
+&gt; What fields are present?
+&gt; Which options are selected?</code></pre>
+<p>Follow-up requests retain one uploaded image in the client-side history. A successful
+<code>/image PATH</code> replaces the image and clears the old history; <code>/reset</code> clears both.
+Control-C cancels the active request and interrupted, failed or truncated turns are not added to the
+history. The service still uses a fresh native worker per turn. This is not a resident image cache,
+multi-image context, or persistent Pi certification.</p>
+<pre><code>python -m scripts.certify_vision_repl --model nemotron-nano-vl --output /tmp/nano-repl.json</code></pre>
+<p>The opt-in real-model check uses two public images with opposite answers. It tests follow-up,
+replacement, cancellation, recovery, and reset in one client against an already running pinned service.</p>
 <p><strong>Nemotron 3 Nano Omni: not supported by this path.</strong> Its C-RADIOv4-H encoder,
 dynamic image geometry, and 2688-wide language bridge require a separate checked artifact contract.
 <a href="https://docs.nvidia.com/nemotron/nightly/nemotron/omni3/architecture.html">Publisher architecture</a>.</p>

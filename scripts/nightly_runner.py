@@ -2281,6 +2281,12 @@ TEST_SUITES = {
         ROOT / "server" / "tests" / "test_pi_vision_once.py",
         timeout_sec=120,
     ),
+    "v8_vision_repl_contract": TestSuite(
+        "Vision REPL History and Cancellation Contract",
+        "inference",
+        ROOT / "server" / "tests" / "test_vision_repl.py",
+        timeout_sec=120,
+    ),
     "v8_hidden_export_extents": TestSuite(
         "Generated Hidden Export Extents",
         "parity",
