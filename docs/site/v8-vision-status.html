@@ -1306,6 +1306,20 @@ python -m server.vision_bundle --nemotron-vl --encoder encoder --decoder decoder
   --image-placeholder '&lt;image&gt;' --output profile.json
 python -m server.vision_http --profile profile.json --threads 10
 python scripts/vision_http_client.py --model nemotron-nano-vl --image form.png --prompt 'Read the text.'</code></pre>
+<h3>Pi one-shot OCR from a local path</h3>
+<p>Use a trusted Pi 0.73.1 installation on the client. Explicitly approve a directory and select one
+relative image path. The launcher rejects links and paths outside the approved directory, stages
+the image in a private temporary directory, and passes it to Pi as an image attachment. It disables
+tools, sessions and auto-compaction so Pi does not send a text-only follow-up to the image endpoint.
+It returns the raw answer text and stop reason, not Pi's input-image events. This is a user-approved
+upload, not a model-selected file or permission prompt.</p>
+<pre><code>python scripts/pi_vision_once.py --base-url http://127.0.0.1:8120 \
+  --approved-root ./images --image form.png \
+  --prompt 'Read the text in the image. Reply with the exact text and nothing else.'</code></pre>
+<p>For a server on another machine, forward the port over SSH. The launcher uses the tested
+1,024-token Nano VL profile and a 32-token output budget. Keep exact formatting and recognized
+text as separate verdicts: a trailing newline does not change the characters read from the image,
+but fails a byte-exact answer check.</p>
 <p><strong>Nemotron 3 Nano Omni: not supported by this path.</strong> Its C-RADIOv4-H encoder,
 dynamic image geometry, and 2688-wide language bridge require a separate checked artifact contract.
 <a href="https://docs.nvidia.com/nemotron/nightly/nemotron/omni3/architecture.html">Publisher architecture</a>.</p>

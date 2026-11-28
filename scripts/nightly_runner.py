@@ -2267,6 +2267,12 @@ TEST_SUITES = {
         ROOT / "server" / "tests" / "test_vision_nemotron.py",
         timeout_sec=120,
     ),
+    "v8_pi_vision_attachment": TestSuite(
+        "Pi One-Shot Vision Attachment Contract",
+        "inference",
+        ROOT / "server" / "tests" / "test_pi_vision_once.py",
+        timeout_sec=120,
+    ),
     "v8_hidden_export_extents": TestSuite(
         "Generated Hidden Export Extents",
         "parity",
