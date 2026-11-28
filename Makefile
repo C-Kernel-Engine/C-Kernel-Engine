@@ -4596,7 +4596,7 @@ test-v8-rwkv7-lowering:
 test-v8-dsl-policy: test-source-integrity test-v8-rwkv7-lowering
 	@echo "Running v8 zero-hardcoding DSL policy tests..."
 	@$(PYTHON) version/v8/scripts/audit_dsl_policy_v8.py --json-out build/v8/dsl_policy_report.json
-	@$(PYTHON) -m unittest tests.test_v8_dsl_policy -v
+	@$(PYTHON) -m unittest tests.test_v8_dsl_policy tests.test_v8_dsl_family_neutrality -v
 	@$(PYTHON) -m unittest tests.test_v8_kernel_call_abi -v
 	@$(PYTHON) -m unittest tests.test_v8_codegen_capabilities -v
 	@$(PYTHON) -m unittest tests.test_v8_sequence_state_contract -v

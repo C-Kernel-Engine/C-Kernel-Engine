@@ -35,7 +35,7 @@ class V8DSLPolicyTests(unittest.TestCase):
 
     def test_shared_training_and_bundle_paths_reject_model_dispatch(self) -> None:
         policy = json.loads(audit.DEFAULT_POLICY.read_text(encoding="utf-8"))
-        for name in ("clef", "kokoro"):
+        for name in ("clef", "kokoro", "inkling", "daisyrose", "drama3"):
             self.assertIn(name, policy["forbidden_model_literals"])
             source = "def lower(config):\n    if config.get('model') == '" + name + "':\n        return 'special'\n"
             self.assertTrue(audit.scan_source(
@@ -141,6 +141,20 @@ def lower(config):
         )
         self.assertEqual(len(findings), 1)
         self.assertEqual(findings[0]["kind"], "model_dispatch")
+
+    def test_subscript_family_dispatch_is_detected_for_an_unknown_family(self):
+        source = "def lower(cfg):\n    arch = cfg['arch']\n    return 1 if arch == 'new' else 2"
+        findings = audit.scan_model_dispatch_source(source, ["arch"], path="lower.py")
+        self.assertEqual([item["kind"] for item in findings], ["model_dispatch"])
+
+    def test_family_keyed_selection_without_if(self):
+        for selection in ("return table[key](cfg)", "return table.get(key, default)(cfg)",
+                          "match key:\n        case 'x': return 1"):
+            for field, expected in (("family", True), ("kernel_id", False)):
+                source = f"def select(cfg):\n    key = cfg['{field}']\n    {selection}"
+                with self.subTest(selection=selection, field=field):
+                    findings = audit.scan_model_dispatch_source(source, ["family"], path="x.py")
+                    self.assertEqual(bool(findings), expected)
 
     def test_ast_policy_allows_exact_operation_dispatch(self) -> None:
         source = """
