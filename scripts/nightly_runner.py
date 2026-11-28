@@ -2239,6 +2239,12 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_instella_vl_checked.py",
         timeout_sec=120,
     ),
+    "v8_nemotron_vl_projector_input": TestSuite(
+        "Nemotron VL Generated Projector Input Packing",
+        "parity",
+        ROOT / "tests" / "test_v8_nemotron_vl_projector_input.py",
+        timeout_sec=120,
+    ),
     "v8_hidden_export_extents": TestSuite(
         "Generated Hidden Export Extents",
         "parity",
