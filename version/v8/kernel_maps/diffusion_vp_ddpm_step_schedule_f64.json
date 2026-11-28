@@ -1,0 +1,199 @@
+{
+  "id": "diffusion_vp_ddpm_step_schedule_f64",
+  "op": "diffusion_vp_ddpm_step_checked",
+  "operation_interface": "diffusion.vp_ddpm.runtime_schedule.explicit_noise.fp64.checked.v1",
+  "variant": "checked_serial",
+  "quant": {
+    "weight": "none",
+    "activation": "fp64",
+    "output": "fp64"
+  },
+  "inputs": [
+    {
+      "name": "latent",
+      "dtype": "fp64",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "estimate",
+      "dtype": "fp64",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "noise",
+      "dtype": "fp64",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "gamma",
+      "dtype": "fp64",
+      "shape": [
+        2
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp64",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "dims": [
+    "N"
+  ],
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "impl": {
+    "function": "ck_diffusion_vp_ddpm_step_schedule_f64",
+    "c_declaration": "int ck_diffusion_vp_ddpm_step_schedule_f64(const double *latent, const double *estimate, const double *noise, const double *gamma, double *output, size_t count, size_t gamma_elements);",
+    "sources": [
+      "src/kernels/diffusion_vp_step.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "latent",
+        "source": "activation:latent",
+        "cast": "const double*",
+        "ports": [
+          "input:latent"
+        ]
+      },
+      {
+        "name": "estimate",
+        "source": "activation:estimate",
+        "cast": "const double*",
+        "ports": [
+          "input:estimate"
+        ]
+      },
+      {
+        "name": "noise",
+        "source": "activation:noise",
+        "cast": "const double*",
+        "ports": [
+          "input:noise"
+        ]
+      },
+      {
+        "name": "gamma",
+        "source": "activation:gamma",
+        "cast": "const double*",
+        "ports": [
+          "input:gamma"
+        ]
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "double*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "count",
+        "source": "runtime:count",
+        "value_type": "size_t"
+      },
+      {
+        "name": "gamma_elements",
+        "source": "runtime:gamma_elements",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "N": "count"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "latent",
+        "elements": "count",
+        "rows": 1,
+        "width": "count",
+        "element_bytes": 8,
+        "storage_dtype": "fp64"
+      },
+      {
+        "pointer": "estimate",
+        "elements": "count",
+        "rows": 1,
+        "width": "count",
+        "element_bytes": 8,
+        "storage_dtype": "fp64"
+      },
+      {
+        "pointer": "noise",
+        "elements": "count",
+        "rows": 1,
+        "width": "count",
+        "element_bytes": 8,
+        "storage_dtype": "fp64"
+      },
+      {
+        "pointer": "gamma",
+        "elements": "gamma_elements",
+        "rows": 1,
+        "width": "gamma_elements",
+        "element_bytes": 8,
+        "storage_dtype": "fp64"
+      },
+      {
+        "pointer": "output",
+        "elements": "count",
+        "rows": 1,
+        "width": "count",
+        "element_bytes": 8,
+        "storage_dtype": "fp64"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_sigma_native_step.py"
+    ]
+  },
+  "notes": "Reuse the FP64 explicit-noise DDPM transition at caller-bound monotonically decreasing gamma endpoints."
+}

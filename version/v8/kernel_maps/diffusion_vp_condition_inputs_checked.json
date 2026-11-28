@@ -1,0 +1,334 @@
+{
+  "id": "diffusion_vp_condition_inputs_checked",
+  "op": "diffusion_vp_condition_inputs_checked",
+  "operation_interface": "diffusion.vp.condition_inputs.checked.v1",
+  "variant": "checked_serial",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp64",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "latent",
+      "dtype": "fp64",
+      "shape": [
+        "R",
+        "D"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "gamma",
+      "dtype": "fp64",
+      "shape": [
+        2
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "self_condition",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "D"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [
+    {
+      "name": "frequencies",
+      "dtype": "fp32",
+      "shape": [
+        "B"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "normalized",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "D"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "prior_input",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "D"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "scaled_self",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "D"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "time_features",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "2*B"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "dims": [
+    "R",
+    "D",
+    "B"
+  ],
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "impl": {
+    "function": "ck_diffusion_vp_condition_inputs_checked",
+    "c_declaration": "int ck_diffusion_vp_condition_inputs_checked(const double *latent, const double *gamma, const float *self_condition, const float *frequencies, float *normalized, float *prior_input, float *scaled_self, float *time_features, size_t rows, size_t width, size_t bands, size_t elements, size_t time_elements, size_t gamma_elements);",
+    "sources": [
+      "src/kernels/diffusion_inference_checked.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "latent",
+        "source": "activation:latent",
+        "cast": "const double*",
+        "ports": [
+          "input:latent"
+        ]
+      },
+      {
+        "name": "gamma",
+        "source": "activation:gamma",
+        "cast": "const double*",
+        "ports": [
+          "input:gamma"
+        ]
+      },
+      {
+        "name": "self_condition",
+        "source": "activation:self_condition",
+        "cast": "const float*",
+        "ports": [
+          "input:self_condition"
+        ]
+      },
+      {
+        "name": "frequencies",
+        "source": "weight:frequencies",
+        "cast": "const float*",
+        "ports": [
+          "weight:frequencies"
+        ]
+      },
+      {
+        "name": "normalized",
+        "source": "output:normalized",
+        "cast": "float*",
+        "ports": [
+          "output:normalized"
+        ]
+      },
+      {
+        "name": "prior_input",
+        "source": "output:prior_input",
+        "cast": "float*",
+        "ports": [
+          "output:prior_input"
+        ]
+      },
+      {
+        "name": "scaled_self",
+        "source": "output:scaled_self",
+        "cast": "float*",
+        "ports": [
+          "output:scaled_self"
+        ]
+      },
+      {
+        "name": "time_features",
+        "source": "output:time_features",
+        "cast": "float*",
+        "ports": [
+          "output:time_features"
+        ]
+      },
+      {
+        "name": "rows",
+        "source": "runtime:rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "width",
+        "source": "runtime:width",
+        "value_type": "size_t"
+      },
+      {
+        "name": "bands",
+        "source": "runtime:bands",
+        "value_type": "size_t"
+      },
+      {
+        "name": "elements",
+        "source": "runtime:elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "time_elements",
+        "source": "runtime:time_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "gamma_elements",
+        "source": "runtime:gamma_elements",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "R": "rows",
+      "D": "width",
+      "B": "bands"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "latent",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 8,
+        "storage_dtype": "fp64",
+        "exact_elements_product": [
+          "rows",
+          "width"
+        ]
+      },
+      {
+        "pointer": "gamma",
+        "elements": "gamma_elements",
+        "rows": 1,
+        "width": "gamma_elements",
+        "element_bytes": 8,
+        "storage_dtype": "fp64"
+      },
+      {
+        "pointer": "self_condition",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32",
+        "exact_elements_product": [
+          "rows",
+          "width"
+        ]
+      },
+      {
+        "pointer": "frequencies",
+        "elements": "bands",
+        "rows": 1,
+        "width": "bands",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      },
+      {
+        "pointer": "normalized",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32",
+        "exact_elements_product": [
+          "rows",
+          "width"
+        ]
+      },
+      {
+        "pointer": "prior_input",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32",
+        "exact_elements_product": [
+          "rows",
+          "width"
+        ]
+      },
+      {
+        "pointer": "scaled_self",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32",
+        "exact_elements_product": [
+          "rows",
+          "width"
+        ]
+      },
+      {
+        "pointer": "time_features",
+        "elements": "time_elements",
+        "rows": 1,
+        "width": "time_elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_sigma_native_step.py"
+    ]
+  },
+  "notes": "FP64 variance normalization, FP32 prior and self-conditioning arithmetic, sine then cosine time features."
+}

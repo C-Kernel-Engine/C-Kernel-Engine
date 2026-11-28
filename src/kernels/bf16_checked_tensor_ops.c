@@ -283,3 +283,16 @@ int ck_argmax_values_bf16_checked(const uint16_t *values, int32_t *index,
     *index = (int32_t)best;
     return 0;
 }
+
+int ck_narrow_f32_bf16_checked(const float *input, uint16_t *out, size_t elements)
+{
+    if (!elements || !valid_span(input, elements, 4) || !valid_span(out, elements, 2) ||
+        overlaps(input, elements * 4, out, elements * 2))
+        return -2;
+    for (size_t i = 0; i < elements; ++i)
+        if (!isfinite(bf16_to_float(float_to_bf16(input[i]))))
+            return -3;
+    for (size_t i = 0; i < elements; ++i)
+        out[i] = float_to_bf16(input[i]);
+    return 0;
+}

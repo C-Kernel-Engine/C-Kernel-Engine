@@ -5,7 +5,7 @@ from version.v8.scripts.build_sigma_bf16_block_v8 import build_circuit as build_
 from version.v8.scripts.replay_bf16_projection_bundle_v8 import projection_graph
 
 
-def build_circuit(rows, *, layers=26, vocabulary=131072, **geometry):
+def build_circuit(rows, *, layers=26, vocabulary=131072, readout=True, **geometry):
     if type(layers) is not int or layers < 1 or type(vocabulary) is not int or vocabulary < 1:
         raise ValueError("positive layers and vocabulary required")
     graph, config, schema = build_block(rows, **geometry)
@@ -59,6 +59,9 @@ def build_circuit(rows, *, layers=26, vocabulary=131072, **geometry):
                 graph_slots={"inputs": {"input": source}, "outputs": {"output": "denoised_hidden"}})
     body["ops"].append(norm)
     weight_specs["encoder.norm.weight"] = ([width], "BF16")
+
+    if not readout:
+        return graph, config, weight_specs
 
     add_buffer("diffusion_scores", [rows, vocabulary], "bf16")
     head = projection_graph(rows, width, vocabulary)["block_types"]["block"]["body"]["ops"][0]

@@ -1,0 +1,170 @@
+{
+  "id": "gather_weight_rows_bf16_checked",
+  "op": "gather_rows_bf16_checked",
+  "operation_interface": "gather.weight_rows.bf16.checked.v1",
+  "variant": "exact_storage_copy",
+  "quant": {
+    "weight": "bf16",
+    "activation": "i32",
+    "output": "bf16"
+  },
+  "inputs": [
+    {
+      "name": "indices",
+      "dtype": "i32",
+      "shape": [
+        "S"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [
+    {
+      "name": "input",
+      "dtype": "bf16",
+      "shape": [
+        "R",
+        "D"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "bf16",
+      "shape": [
+        "S",
+        "D"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "dims": [
+    "R",
+    "S",
+    "D"
+  ],
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "impl": {
+    "function": "ck_gather_rows_bf16_checked",
+    "sources": [
+      "src/kernels/gather_rows_bf16_checked.c"
+    ],
+    "c_declaration": "int ck_gather_rows_bf16_checked(const uint16_t *input, size_t input_elements, const int32_t *indices, size_t index_elements, uint16_t *output, size_t output_elements, size_t input_rows, size_t output_rows, size_t width);"
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "weight:input",
+        "cast": "const uint16_t*",
+        "ports": [
+          "weight:input"
+        ]
+      },
+      {
+        "name": "input_elements",
+        "source": "runtime:input_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "indices",
+        "source": "activation:indices",
+        "cast": "const int32_t*",
+        "ports": [
+          "input:indices"
+        ]
+      },
+      {
+        "name": "index_elements",
+        "source": "runtime:index_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "uint16_t*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "input_rows",
+        "source": "runtime:input_rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output_rows",
+        "source": "runtime:output_rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "width",
+        "source": "runtime:width",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "R": "input_rows",
+      "S": "output_rows",
+      "D": "width"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "input_elements",
+        "rows": "input_rows",
+        "width": "width",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      },
+      {
+        "pointer": "indices",
+        "elements": "index_elements",
+        "rows": "output_rows",
+        "width": 1,
+        "element_bytes": 4,
+        "storage_dtype": "i32"
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": "output_rows",
+        "width": "width",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_sigma_native_step.py"
+    ]
+  },
+  "notes": "Checked zero-based I32 row indices. Copies exact BF16 storage bits in index order after validating every index. Repeated indices are valid and errors leave the output unchanged."
+}

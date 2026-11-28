@@ -1,0 +1,111 @@
+{
+  "id": "narrow_f32_bf16_checked",
+  "op": "narrow_f32_bf16_checked",
+  "operation_interface": "tensor.narrow_fp32_bf16_rne.checked.v1",
+  "variant": "checked_serial",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "bf16"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "bf16",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "dims": [
+    "N"
+  ],
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "impl": {
+    "function": "ck_narrow_f32_bf16_checked",
+    "c_declaration": "int ck_narrow_f32_bf16_checked(const float *input, uint16_t *out, size_t elements);",
+    "sources": [
+      "src/kernels/bf16_checked_tensor_ops.c",
+      "src/kernels/gelu_kernels.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "input",
+        "source": "activation:input",
+        "cast": "const float*",
+        "ports": [
+          "input:input"
+        ]
+      },
+      {
+        "name": "out",
+        "source": "output:out",
+        "cast": "uint16_t*",
+        "ports": [
+          "output:out"
+        ]
+      },
+      {
+        "name": "elements",
+        "source": "runtime:elements",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "N": "elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "input",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      },
+      {
+        "pointer": "out",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 2,
+        "storage_dtype": "bf16"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_sigma_native_step.py"
+    ]
+  },
+  "notes": "Convert finite input to finite BF16 with round-to-nearest-even."
+}

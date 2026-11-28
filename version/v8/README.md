@@ -274,3 +274,29 @@ same BLAS settings. The test hashes both payloads, checks per-head logits and
 greedy IDs against PyTorch, and records local and propagated layer error.
 The pinned real-weight case currently misses the parity gate. The portable
 synthetic pass covers feedback, A→B→A, and rejection/recovery.
+
+### Sigma BF16 fixed-noise generation replay
+
+Use the same checkpoint and LP64 BLAS configuration with
+`python -m pytest -q tests/test_v8_sigma_native_step.py`. The replay executes
+one generated clean-token prefill entry and one reusable generated denoising
+entry. The native schedule driver accepts the prefilled clean K/V, a strictly
+decreasing FP64 gamma schedule, initial FP64 latent, and one supplied FP64
+noise row per update. It resets self-conditioning for each request. The
+driver publishes conditional token IDs after the final evaluation and
+preserves the caller's output on failure or cancellation.
+
+The pinned replay uses the six prompt IDs for “The capital of France is,”
+three generated positions, three DDPM transitions and one terminal
+evaluation at guidance 1.75 and score temperature 1. The conditional branch
+reads the prefix and feeds back its own mean. The unconditional branch sees
+only the current block. Its mean contributes to the guided estimate. The
+test records any unconditional argmax differences as diagnostics and checks
+the logits and both means against the independent PyTorch calculation.
+Conditional IDs must match along the trajectory.
+
+This is a fixed-width, single-block scope with caller-supplied noise and
+separate prepared prefill and step arenas. Progression to subsequent
+generated blocks, RNG policy, and serving require additional runtime
+contracts. The real fixture requires about 20 GiB available memory. To retain
+the report, use `-o junit_family=xunit1 --junitxml sigma-native-step.xml`.
