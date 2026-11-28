@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock
 
+from scripts.certify_pi_vision_replacement import call as call_pi
 from scripts.vision_repl import VisionConversation, VisionHTTP, read_stream
 
 
@@ -90,6 +91,32 @@ class VisionReplTests(unittest.TestCase):
         for endpoint in ('http://example.org:8120', 'http://127.0.0.1:8120/login', 'http://127.0.0.1:65536'):
             with self.subTest(endpoint=endpoint), self.assertRaises(ValueError):
                 VisionHTTP(endpoint, 'test', 10, 16)
+
+    def test_pi_replacement_fails_on_stale_images_and_unacknowledged_turns(self):
+        part = {'type': 'image', 'mimeType': 'image/png', 'data': 'Ag=='}
+        command = {'id': 'new', 'type': 'prompt', 'images': [part]}
+        ack = {'type': 'response', 'id': 'new', 'command': 'prompt', 'success': True}
+        user = {'role': 'user', 'content': [part]}
+        answer = {'role': 'assistant', 'content': [{'type': 'text', 'text': 'blue'}],
+                  'stopReason': 'stop', 'responseId': RID}
+
+        def pipe(events):
+            return Mock(stdin=io.StringIO(), stdout=io.StringIO('\n'.join(map(json.dumps, events))))
+
+        def end(messages):
+            return {'type': 'agent_end', 'messages': messages}
+
+        result = call_pi(pipe([ack, end([user, answer])]), command)
+        self.assertEqual(result['text'], 'blue')
+        self.assertEqual(result['request_id'], RID)
+        for events in ([end([user, answer])], [ack, end([user, user, answer])],
+                       [ack, end([{'role': 'user', 'content': [dict(part, data='AA==')]}, answer])]):
+            with self.subTest(events=events), self.assertRaises(ValueError):
+                call_pi(pipe(events), command)
+        reset = {'type': 'response', 'id': 'reset', 'command': 'new_session', 'success': True,
+                 'data': {'cancelled': True}}
+        with self.assertRaisesRegex(ValueError, 'did not replace'):
+            call_pi(pipe([reset]), {'type': 'new_session', 'id': 'reset'})
 
 
 if __name__ == '__main__':

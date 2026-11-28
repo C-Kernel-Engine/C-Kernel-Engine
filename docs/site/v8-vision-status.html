@@ -1346,6 +1346,11 @@ multi-image context, or persistent Pi certification.</p>
 <pre><code>python -m scripts.certify_vision_repl --model nemotron-nano-vl --output /tmp/nano-repl.json</code></pre>
 <p>The opt-in real-model check uses two public images with opposite answers. It tests follow-up,
 replacement, cancellation, recovery, and reset in one client against an already running pinned service.</p>
+<p>A separate Pi 0.73.1 RPC acceptance command tests A, B, then A again in one Pi process.
+It explicitly resets the session before each replacement and rejects a stale image or history.
+It does not add automatic file selection, resident model state or a Pi cancellation claim.</p>
+<pre><code>timeout 600 python -m scripts.certify_pi_vision_replacement \
+  --model nemotron-nano-vl --output /tmp/nano-pi-replacement.json</code></pre>
 <p><strong>Nemotron 3 Nano Omni: not supported by this path.</strong> Its C-RADIOv4-H encoder,
 dynamic image geometry, and 2688-wide language bridge require a separate checked artifact contract.
 <a href="https://docs.nvidia.com/nemotron/nightly/nemotron/omni3/architecture.html">Publisher architecture</a>.</p>
