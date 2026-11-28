@@ -119,12 +119,10 @@ class CompiledRadioEncoder:
         self.patch = CompiledClipStage(
             directory / "patch", patch_projection(GRID**2, 3 * PATCH**2, CHANNELS),
             {"patch.weight": widen(read_weight(RADIO + "patch_generator.embedder.weight"))},
-            openmp=True,
         )
         self.position = CompiledClipStage(directory / "position", positioned_patches(), {})
         graph = radio_block(GRID**2 + REGISTERS, CHANNELS, 16, 4 * CHANNELS)
-        self.block = CompiledClipStage(directory / "block", graph, self._weights(0, graph.weights),
-                                       openmp=True)
+        self.block = CompiledClipStage(directory / "block", graph, self._weights(0, graph.weights))
 
     def _weights(self, layer, keys):
         prefix = RADIO + f"blocks.{layer}."
