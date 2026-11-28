@@ -1656,8 +1656,25 @@ python3 version/v8/scripts/export_llama_hidden_v8.py \
      For the second block, maximum latent trajectory error is 0.00480 and maximum
      appended K/V error is 0.09375. Resetting the prompt and repeating both blocks
      through direct native dispatch reproduces the token IDs and cache bit for bit.
-     The replay uses compiled prompt and block widths, a single-owner arena,
-     and supplied noise.</p>
+     That comparison used a single-owner arena and supplied noise.</p>
+
+  <h4 id="sigma-seeded-generation">Seeded native token generation</h4>
+  <p>Call <code>ck_generate_seeded_diffusion</code> with prompt token IDs,
+     a seed, a descending log-SNR schedule, guidance, and a token budget.
+     One loaded bundle accepts any positive prompt length up to its prefill
+     capacity. Causal attention isolates the valid prefix from the padded
+     rows. Only the valid prefix is copied into the cache.</p>
+  <p>The runtime draws an FP64 initial latent and update noise from the
+     SplitMix64 and Box-Muller stream for each block, then drives the generated
+     denoise and append entries. Scratch holds one block of noise and is
+     reused. The budget must be a whole number of blocks and fit alongside
+     the prompt in the cache. After cancellation, the output count describes
+     the committed token prefix. A fresh request starts with a clean cache.</p>
+  <p>The same test command exercises seeded generation and replays CKE's
+     exact samples in an independent PyTorch comparison. RNG repeatability is
+     scoped to the same build and math library. The token-level entry uses
+     a fixed budget. Text tokenization, EOS behavior, and serving require
+     separate acceptance tests.</p>
 
   <h2 id="xray-diagnosis">11. Diagnose divergence with X-Ray</h2>
   <p>When parity fails, do not poke at tolerances. Walk the decision tree &mdash; each branch names an owner, and the fix lands in that owner's artifact (see <a href="xray.html">the X-Ray page</a> for the full evidence model and capture-neutrality gates):</p>

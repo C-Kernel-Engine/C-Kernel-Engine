@@ -25,9 +25,9 @@ def mix64(value):
     return value ^ (value >> 31)
 
 
-def oracle(count, seed, stream):
+def oracle(count, seed, stream, *, dtype=np.float32):
     domain = mix64(seed ^ mix64(stream))
-    result = np.empty(count, dtype=np.float32)
+    result = np.empty(count, dtype=dtype)
     for index in range(count):
         first = mix64((domain + 2 * index) & MASK)
         second = mix64((domain + 2 * index + 1) & MASK)

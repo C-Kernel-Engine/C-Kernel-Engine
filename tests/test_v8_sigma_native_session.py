@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from tests.test_v8_audio_noise_counter_oracle import oracle as gaussian_oracle
 from tests.test_v8_sigma_native_step import bits, encoder, pinned_weights, reference, widen
 from version.v8.scripts.build_sigma_native_session_v8 import build_circuit
 from version.v8.scripts.checked_execution_exports_v8 import load_exports
@@ -52,6 +53,16 @@ class Block(C.Structure):
     ]
 
 
+class Seeded(C.Structure):
+    _fields_ = [
+        ("prompt_ids", PTR), ("prompt_rows", SIZE), ("schedule", PTR), ("schedule_count", SIZE),
+        ("seed", C.c_uint64), ("token_budget", SIZE), ("guidance", C.c_float),
+        ("workspace", PTR), ("workspace_elements", SIZE), ("staged_ids", PTR), ("output_ids", PTR),
+        ("staged_capacity", SIZE), ("output_capacity", SIZE), ("generated_rows", SIZE),
+        ("should_cancel", PTR), ("cancel_context", PTR),
+    ]
+
+
 def run_session(tmp_path, torch, geometry, weights, prompt_ids, *, blas=False):
     prompt_rows, rows = len(prompt_ids), 3
     capacity = prompt_rows + 2 * rows
@@ -63,7 +74,7 @@ def run_session(tmp_path, torch, geometry, weights, prompt_ids, *, blas=False):
     _, arena, view, library = compile_checked_weight_graph(
         tmp_path, graph, inputs, schema, source_config=config, target_isa="avx2" if blas else "portable",
         runtime_sources=("src/runtime/checked_diffusion_session.c", "src/runtime/checked_diffusion_schedule.c"),
-        extra_exports=exports,
+        extra_exports=(*exports, "ck_generate_seeded_diffusion"),
     )
     address = C.addressof(arena)
     checked = load_exports(tmp_path, library)
@@ -97,14 +108,21 @@ def run_session(tmp_path, torch, geometry, weights, prompt_ids, *, blas=False):
     prefill, append, generate = (getattr(library, name) for name in exports)
     prefill.argtypes = append.argtypes = [C.POINTER(Session), PTR, SIZE, PTR, PTR]
     generate.argtypes = [C.POINTER(Session), C.POINTER(Block)]
+    seeded = library.ck_generate_seeded_diffusion
+    seeded.argtypes = [C.POINTER(Session), C.POINTER(Seeded)]
     step = getattr(library, checked["entries"]["step"])
     step.argtypes = [PTR, SIZE]
     step.restype = C.c_int
     step_pointer = C.cast(step, PTR)
     traced = []
+    workspace = np.full((4, rows, geometry["latent_width"]), -71., np.float64)
+    seeded_inputs = []
+    capture_seeded = False
 
     @ENTRY
     def traced_step(ptr, length):
+        if capture_seeded and len(traced) % len(workspace) == 0:
+            seeded_inputs.append(workspace.copy())
         status = step(ptr, length)
         if status == 0:
             traced.append((view("step_next_latent", np.float64).copy(), view("step_cond_ids", np.int32).copy()))
@@ -149,6 +167,31 @@ def run_session(tmp_path, torch, geometry, weights, prompt_ids, *, blas=False):
     rng = torch.Generator().manual_seed(19057)
     gamma = torch.tensor([2.0, 0.5, -0.75, -2.5], dtype=torch.float64)
     schedule = gamma.numpy()
+    def compare_block(valid, latent, noises, reference_cache, traced, generated):
+        absolute = torch.arange(valid, valid + rows, dtype=torch.int32)
+        causal = absolute[:, None] >= torch.arange(valid + rows, dtype=torch.int32)
+        # Compare an independent iterative trajectory using only the oracle's prefix.
+        z, self_condition = latent, torch.zeros_like(latent).float()
+        visible = torch.ones((rows, valid + rows), dtype=torch.bool)
+        deltas = []
+        for j, (native_z, native_ids) in enumerate(traced):
+            last = j == len(schedule) - 1
+            pair = gamma[j:j+1].repeat(2) if last else gamma[j:j+2]
+            result = reference(weights, geometry, z, torch.zeros_like(z) if last else noises[j],
+                               self_condition, pair, 1.75, absolute, visible, reference_cache)
+            z, self_condition = result["next_latent"], result["cond_mean"]
+            deltas.append({"latent_max": float(np.max(np.abs(native_z - z.numpy()))),
+                           "conditional_ids": int(np.sum(native_ids == result["cond_ids"].numpy()))})
+        expected_ids = result["cond_ids"].tolist()
+        _, new_rows = encoder(weights_table[expected_ids], absolute, causal, weights, geometry, reference_cache)
+        prefix_error = max(float(np.abs(widen(native[valid:valid+rows]) -
+                           expected.transpose(0, 1).reshape(rows, -1).float().numpy()).max())
+                           for native, expected in zip(caches, (x for pair in new_rows for x in pair), strict=True))
+        reference_cache = [tuple(torch.cat((a, b), dim=1) for a, b in zip(old, new, strict=True))
+                           for old, new in zip(reference_cache, new_rows, strict=True)]
+        return {"ids": generated.tolist(), "oracle_ids": expected_ids, "appended_kv_max": prefix_error,
+                "trajectory": deltas, "cache_rows": valid + rows}, reference_cache
+
     blocks = []
     all_ids, native_inputs = [], []
     for i in range(2):
@@ -220,30 +263,9 @@ def run_session(tmp_path, torch, geometry, weights, prompt_ids, *, blas=False):
             np.testing.assert_array_equal(cache[:valid], old[:valid])
             np.testing.assert_array_equal(cache[valid + rows:], 0)
 
-        absolute = torch.arange(valid, valid + rows, dtype=torch.int32)
-        causal = absolute[:, None] >= torch.arange(valid + rows, dtype=torch.int32)
-        # Compare an independent iterative trajectory using only the oracle's prefix.
-        z, self_condition = latent, torch.zeros_like(latent).float()
-        visible = torch.ones((rows, valid + rows), dtype=torch.bool)
-        deltas = []
-        for j, (native_z, native_ids) in enumerate(traced):
-            last = j == len(schedule) - 1
-            pair = gamma[j:j+1].repeat(2) if last else gamma[j:j+2]
-            result = reference(weights, geometry, z, torch.zeros_like(z) if last else noises[j],
-                               self_condition, pair, 1.75, absolute, visible, reference_cache)
-            z, self_condition = result["next_latent"], result["cond_mean"]
-            deltas.append({"latent_max": float(np.max(np.abs(native_z - z.numpy()))),
-                           "conditional_ids": int(np.sum(native_ids == result["cond_ids"].numpy()))})
-        expected_ids = result["cond_ids"].tolist()
-        _, new_rows = encoder(weights_table[expected_ids], absolute, causal, weights, geometry, reference_cache)
-        prefix_error = max(float(np.abs(widen(native[valid:valid+rows]) -
-                           expected.transpose(0, 1).reshape(rows, -1).float().numpy()).max())
-                           for native, expected in zip(caches, (x for pair in new_rows for x in pair), strict=True))
-        reference_cache = [tuple(torch.cat((a, b), dim=1) for a, b in zip(old, new, strict=True))
-                           for old, new in zip(reference_cache, new_rows, strict=True)]
-        all_ids.extend(output[:-1].tolist())
-        blocks.append({"ids": output[:-1].tolist(), "oracle_ids": expected_ids, "appended_kv_max": prefix_error,
-                       "trajectory": deltas, "cache_rows": int(state.valid_rows)})
+        block, reference_cache = compare_block(valid, latent, noises, reference_cache, traced, output[:-1])
+        blocks.append(block)
+        all_ids.extend(block["ids"])
         native_inputs.append((raw_latent, raw_noises))
 
     full = snapshot()
@@ -267,7 +289,114 @@ def run_session(tmp_path, torch, geometry, weights, prompt_ids, *, blas=False):
         assert generate(s, r) == 0
         np.testing.assert_array_equal(output[:-1], block["ids"])
     compare_cache(full)
-    return {"blocks": blocks, "committed_ids": all_ids, "request_recovery": True}
+    seeded_output = np.full(2 * rows + 1, -81, np.int32)
+    seeded_request = Seeded(
+        prompt.ctypes.data, len(prompt), schedule.ctypes.data, len(schedule), 19057, 2 * rows, 1.75,
+        workspace.ctypes.data, workspace.size, staging.ctypes.data, seeded_output.ctypes.data,
+        len(staging), len(seeded_output), 99, None, None,
+    )
+    request_ptr = C.byref(seeded_request)
+    if not blas:
+        ascending = schedule[::-1].copy()
+        for field, invalid in (("token_budget", 2 * rows + 1), ("output_capacity", rows - 1),
+                               ("workspace_elements", workspace.size - 1),
+                               ("workspace", workspace.ctypes.data + 1), ("output_ids", prompt.ctypes.data),
+                               ("prompt_ids", invalid_prompt.ctypes.data), ("prompt_rows", 0),
+                               ("schedule", ascending.ctypes.data)):
+            original = getattr(seeded_request, field)
+            setattr(seeded_request, field, invalid)
+            assert seeded(s, request_ptr) == -1
+            setattr(seeded_request, field, original)
+            assert seeded_request.generated_rows == 99
+            assert state.valid_rows == capacity
+            np.testing.assert_array_equal(seeded_output, -81)
+            np.testing.assert_array_equal(workspace, -71.)
+            compare_cache(full)
+
+    def seeded_trial(ids, budget, seed):
+        nonlocal capture_seeded
+        seeded_request.prompt_ids, seeded_request.prompt_rows = ids.ctypes.data, len(ids)
+        seeded_request.token_budget, seeded_request.seed = budget, seed
+        seeded_output.fill(-81)
+        traced.clear()
+        seeded_inputs.clear()
+        state.step = C.cast(traced_step, PTR)
+        capture_seeded = True
+        status = seeded(s, request_ptr)
+        capture_seeded = False
+        state.step = step_pointer
+        assert status == 0
+        assert seeded_request.generated_rows == budget
+        assert state.valid_rows == len(ids) + budget
+        np.testing.assert_array_equal(seeded_output[budget:], -81)
+        for cache in caches:
+            np.testing.assert_array_equal(cache[state.valid_rows:], 0)
+        assert len(seeded_inputs) == budget // rows
+        assert len(traced) == len(seeded_inputs) * len(schedule)
+        pos = torch.arange(len(ids), dtype=torch.int32)
+        _, oracle_cache = encoder(weights_table[ids.tolist()], pos, pos[:, None] >= pos[None, :],
+                                  weights, geometry)
+        reports = []
+        for i, noise_inputs in enumerate(seeded_inputs):
+            np.testing.assert_allclose(
+                noise_inputs.ravel(), gaussian_oracle(noise_inputs.size, seed, i, dtype=np.float64),
+                atol=2e-14, rtol=0,
+            )
+            expected_trace = traced[i * len(schedule):(i + 1) * len(schedule)]
+            block, oracle_cache = compare_block(
+                len(ids) + i * rows, torch.from_numpy(noise_inputs[0]), torch.from_numpy(noise_inputs[1:]),
+                oracle_cache, expected_trace, seeded_output[i * rows:(i + 1) * rows],
+            )
+            reports.append(block)
+        return reports, snapshot(), np.stack(seeded_inputs)
+
+    first, seed_cache, seed_inputs = seeded_trial(prompt, 2 * rows, 19057)
+    assert not np.array_equal(seed_inputs[0], seed_inputs[1])
+    shorter = prompt[:-1].copy()
+    second, _, other_inputs = seeded_trial(shorter, rows, 151)
+    assert not np.array_equal(seed_inputs[0], other_inputs[0])
+
+    if not blas:
+        # Stop in the second block after its first denoise step. A committed
+        # block must survive and the partially generated block stays private.
+        calls = []
+
+        @ENTRY
+        def count_step(ptr, length):
+            calls.append(None)
+            return step(ptr, length)
+
+        @CANCEL
+        def cancel_second(_):
+            return int(len(calls) > len(schedule))
+
+        seeded_request.should_cancel = C.cast(cancel_second, PTR)
+        seeded_request.prompt_ids, seeded_request.prompt_rows = prompt.ctypes.data, len(prompt)
+        seeded_request.seed, seeded_request.token_budget = 19057, 2 * rows
+        seeded_output.fill(-81)
+        state.step = C.cast(count_step, PTR)
+        assert seeded(s, request_ptr) == -7
+        assert len(calls) == len(schedule) + 1
+        assert seeded_request.generated_rows == rows
+        assert state.valid_rows == len(prompt) + rows
+        np.testing.assert_array_equal(seeded_output[:rows], first[0]["ids"])
+        np.testing.assert_array_equal(seeded_output[rows:], -81)
+        for cache, expected in zip(caches, seed_cache, strict=True):
+            np.testing.assert_array_equal(cache[:state.valid_rows], expected[:state.valid_rows])
+            np.testing.assert_array_equal(cache[state.valid_rows:], 0)
+        seeded_request.should_cancel = None
+
+        # Repeat through the direct generated entry with no host callbacks.
+        state.step = step_pointer
+        assert seeded(s, request_ptr) == 0
+        assert state.valid_rows == capacity
+        assert seeded_request.generated_rows == 2 * rows
+        np.testing.assert_array_equal(seeded_output, [*first[0]["ids"], *first[1]["ids"], -81])
+        compare_cache(seed_cache)
+        np.testing.assert_array_equal(workspace, seed_inputs[-1])
+
+    return {"blocks": blocks, "seeded_blocks": first + second, "committed_ids": all_ids,
+            "request_recovery": True}
 
 
 def test_native_sigma_two_blocks(tmp_path):
@@ -283,7 +412,7 @@ def test_native_sigma_two_blocks(tmp_path):
     weights["normalized_embedding"] = torch.nn.functional.normalize(weights["normalized_embedding"], dim=-1)
     weights["inv_freq"] = torch.tensor([1.0, 0.1, 0.001])
     report = run_session(tmp_path, torch, geometry, weights, (1, 7, 12))
-    for block in report["blocks"]:
+    for block in report["blocks"] + report["seeded_blocks"]:
         assert block["ids"] == block["oracle_ids"], report
         assert block["appended_kv_max"] <= .015625, report
         assert max(d["latent_max"] for d in block["trajectory"]) <= .008, report
@@ -304,7 +433,7 @@ def test_pinned_sigma_two_blocks(tmp_path, record_property):
     weights = pinned_weights(Path(checkpoint), schema, torch, safetensors)
     report = run_session(tmp_path, torch, geometry, weights, ids, blas=True)
     record_property("metrics", json.dumps(report))
-    for block in report["blocks"]:
+    for block in report["blocks"] + report["seeded_blocks"]:
         assert block["ids"] == block["oracle_ids"], report
         assert block["appended_kv_max"] <= .25, report
         assert max(d["latent_max"] for d in block["trajectory"]) <= .08, report
