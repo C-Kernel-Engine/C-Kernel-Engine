@@ -1,0 +1,46 @@
+[
+  {
+    "name": "cheque",
+    "image_sha256": "030a07b70f6c76ff6773cdef91bb3ab1a83a2cd8f0baf5bada918efde5dcf5b4",
+    "prompt": "Extract plain JSON only with keys number, date, payee, amount. Preserve the leading zero in the cheque number.",
+    "expected": {
+      "number": "0142",
+      "date": "2026-11-28",
+      "payee": "MIRA CHEN",
+      "amount": "27.50"
+    },
+    "text": "```json\n{\n  \"number\": \"0142\",\n  \"date\": \"2026-11-28\",\n  \"payee\": \"MIRA CHEN\",\n  \"amount\": \"$27.50\"\n}\n```\n",
+    "stop_reason": "stop"
+  },
+  {
+    "name": "receipt",
+    "image_sha256": "2cf2ae8302dc14d80a0641a4c0121c0020745636fa1f323b9ca6b9f52cfd70fb",
+    "prompt": "Extract receipt fields as plain JSON only: merchant, date, subtotal, tax, total, and items (object mapping printed item names to prices). Do not calculate or add fields.",
+    "expected": {
+      "merchant": "NORTH MARKET",
+      "date": "2026-11-28",
+      "subtotal": "12.75",
+      "tax": "0.64",
+      "total": "13.39",
+      "items": {
+        "OAT MILK": "4.25",
+        "RYE BREAD": "5.50",
+        "PEARS": "3.00"
+      }
+    },
+    "text": "```json\n{\n  \"merchant\": \"NORTH MARKET\",\n  \"date\": \"2026-11-28\",\n  \"subtotal\": 12.75,\n  \"tax\": 0.64,\n  \"total\": 13.39,\n  \"items\": {\n    \"OAT MILK\": 4.25,\n    \"RYE BREAD\": 5.50,\n    \"PEARS\": 3.00\n  }\n}\n```\n",
+    "stop_reason": "stop"
+  },
+  {
+    "name": "checkbox",
+    "image_sha256": "127e6dfc67da0e9ad35359e430d1077dc7e7f8c69d43272bce6bff10475283dd",
+    "prompt": "Read the checkboxes. JSON only, keys email, sms, paper. Values are true if checked and false if empty.",
+    "expected": {
+      "email": true,
+      "sms": false,
+      "paper": true
+    },
+    "text": "```json\n{\n  \"email\": true,\n  \"sms\": false,\n  \"paper\": true\n}\n```\n",
+    "stop_reason": "stop"
+  }
+]
