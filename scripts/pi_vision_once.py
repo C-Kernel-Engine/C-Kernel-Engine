@@ -112,6 +112,20 @@ def structured_result(result, validator):
     return dict(result, data=value, json_source='fenced' if fence else 'plain')
 
 
+def write_pi_profile(agent, endpoint, model, context_tokens, max_tokens):
+    config = {'providers': {'local-cke': {
+        'baseUrl': endpoint.rstrip('/') + '/v1', 'api': 'openai-completions', 'apiKey': 'local-only',
+        'compat': {'supportsStore': False, 'supportsDeveloperRole': False,
+                   'supportsReasoningEffort': False, 'maxTokensField': 'max_tokens'},
+        'models': [{'id': model, 'name': model, 'input': ['text', 'image'],
+                    'contextWindow': context_tokens, 'maxTokens': max_tokens,
+                    'cost': dict.fromkeys(('input', 'output', 'cacheRead', 'cacheWrite'), 0)}],
+    }}}
+    (agent / 'models.json').write_text(json.dumps(config))
+    (agent / 'settings.json').write_text(json.dumps({'compaction': {'enabled': False},
+                                                     'retry': {'enabled': False}}))
+
+
 def run(pi, endpoint, model, root, image, prompt, timeout, *, max_tokens=32):
     if type(max_tokens) is not int or not 1 <= max_tokens < CONTEXT_TOKENS:
         raise ValueError('output budget must be between 1 and 1023 tokens')
@@ -132,17 +146,7 @@ def run(pi, endpoint, model, root, image, prompt, timeout, *, max_tokens=32):
         agent.mkdir(mode=0o700)
         attachment = scratch / ('image' + suffix)
         attachment.write_bytes(data)
-        config = {'providers': {'local-cke': {
-            'baseUrl': endpoint.rstrip('/') + '/v1', 'api': 'openai-completions', 'apiKey': 'local-only',
-            'compat': {'supportsStore': False, 'supportsDeveloperRole': False,
-                       'supportsReasoningEffort': False, 'maxTokensField': 'max_tokens'},
-            'models': [{'id': model, 'name': 'Pinned Nano VL', 'input': ['text', 'image'],
-                        'contextWindow': CONTEXT_TOKENS, 'maxTokens': max_tokens,
-                        'cost': dict.fromkeys(('input', 'output', 'cacheRead', 'cacheWrite'), 0)}],
-        }}}
-        (agent / 'models.json').write_text(json.dumps(config))
-        (agent / 'settings.json').write_text(json.dumps({'compaction': {'enabled': False},
-                                                         'retry': {'enabled': False}}))
+        write_pi_profile(agent, endpoint, model, CONTEXT_TOKENS, max_tokens)
         env = dict(os.environ, PI_CODING_AGENT_DIR=str(agent))
         result = subprocess.run([
             str(Path(executable).resolve()), '--offline', '--no-session', '--no-extensions',
