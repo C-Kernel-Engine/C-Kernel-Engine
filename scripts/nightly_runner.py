@@ -2255,6 +2255,12 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_nemotron_vl_projector.py",
         timeout_sec=120,
     ),
+    "v8_nemotron_radio_checked": TestSuite(
+        "Nemotron VL Generated RADIO Block",
+        "parity",
+        ROOT / "tests" / "test_v8_nemotron_radio_checked.py",
+        timeout_sec=120,
+    ),
     "v8_hidden_export_extents": TestSuite(
         "Generated Hidden Export Extents",
         "parity",
