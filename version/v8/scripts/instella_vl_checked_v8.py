@@ -58,7 +58,7 @@ class Graph:
         self.buffers[name] = {"shape": [self.rows, n]}
         self.ops.append(linear(name, source, name, k, n, self.rows, key))
 
-    def norm(self, name, source, width, key):
+    def norm(self, name, source, width, key, *, epsilon=1e-5):
         count, scratch = self.rows * width, self.rows * (width + 2)
         self.op(name, "layernorm_rows_param_checked", "layernorm_rows_checked_param_epsilon_f32",
                 {"input": source}, width, {
@@ -68,7 +68,7 @@ class Graph:
                     "norm_scratch_elements": scratch, "norm_rows": self.rows, "norm_channels": width,
                 }, refs={"gamma": self.weight(key + ".weight", width),
                          "beta": self.weight(key + ".bias", width)},
-                M=self.rows, C=width, Q=scratch, epsilon=1e-5)
+                M=self.rows, C=width, Q=scratch, epsilon=epsilon)
 
     def add(self, name, left, right, width):
         count = self.rows * width
