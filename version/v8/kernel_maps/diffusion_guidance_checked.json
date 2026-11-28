@@ -1,0 +1,171 @@
+{
+  "id": "diffusion_guidance_checked",
+  "op": "diffusion_guidance_checked",
+  "operation_interface": "diffusion.guidance.f32_to_f64.checked.v1",
+  "variant": "checked_serial",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp64"
+  },
+  "inputs": [
+    {
+      "name": "conditional",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "unconditional",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "scale",
+      "dtype": "fp32",
+      "shape": [
+        1
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp64",
+      "shape": [
+        "N"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "dims": [
+    "N"
+  ],
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "impl": {
+    "function": "ck_diffusion_guidance_checked",
+    "c_declaration": "int ck_diffusion_guidance_checked(const float *conditional, const float *unconditional, const float *scale, double *output, size_t elements, size_t scale_elements);",
+    "sources": [
+      "src/kernels/diffusion_inference_checked.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "conditional",
+        "source": "activation:conditional",
+        "cast": "const float*",
+        "ports": [
+          "input:conditional"
+        ]
+      },
+      {
+        "name": "unconditional",
+        "source": "activation:unconditional",
+        "cast": "const float*",
+        "ports": [
+          "input:unconditional"
+        ]
+      },
+      {
+        "name": "scale",
+        "source": "activation:scale",
+        "cast": "const float*",
+        "ports": [
+          "input:scale"
+        ]
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "double*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "elements",
+        "source": "runtime:elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "scale_elements",
+        "source": "runtime:scale_elements",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "N": "elements"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "conditional",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      },
+      {
+        "pointer": "unconditional",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      },
+      {
+        "pointer": "scale",
+        "elements": "scale_elements",
+        "rows": 1,
+        "width": "scale_elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      },
+      {
+        "pointer": "output",
+        "elements": "elements",
+        "rows": 1,
+        "width": "elements",
+        "element_bytes": 8,
+        "storage_dtype": "fp64"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_sigma_native_step.py"
+    ]
+  },
+  "notes": "Unguided plus scale times the conditional difference in FP32, widened to FP64 for the transition."
+}

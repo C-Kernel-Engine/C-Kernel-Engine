@@ -2,12 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-static double vp_sigmoid(double x)
-{
-    if (x >= 0.0) return 1.0 / (1.0 + exp(-x));
-    const double e = exp(x);
-    return e / (1.0 + e);
-}
+#include "diffusion_vp_common.h"
 
 static int vp_region_valid(const double *data, size_t count)
 {
@@ -64,4 +59,15 @@ int ck_diffusion_vp_ddpm_step_f64(const double *latent, const double *estimate,
                              residual_gain, estimate_gain, noise_gain);
     }
     return 0;
+}
+
+/* Identical transition with caller-bound schedule endpoints. */
+int ck_diffusion_vp_ddpm_step_schedule_f64(const double *latent, const double *estimate,
+                                          const double *noise, const double *gamma, double *output,
+                                          size_t count, size_t gamma_elements)
+{
+    if (gamma_elements != 2 || !vp_region_valid(gamma, 2) || !vp_region_valid(output, count)) return -1;
+    const uintptr_t begin = (uintptr_t)gamma, out = (uintptr_t)output;
+    if (begin < out + count * sizeof(double) && out < begin + 2 * sizeof(double)) return -1;
+    return ck_diffusion_vp_ddpm_step_f64(latent, estimate, noise, output, count, gamma[0], gamma[1]);
 }
