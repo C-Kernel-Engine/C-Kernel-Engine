@@ -4,6 +4,7 @@ var bf16__checked__tensor__ops_8c =
     [ "ck_add_bf16_checked", "bf16__checked__tensor__ops_8c.html#a472f2a9fd5e6f3aca8ad4c9b5d3ba3bb", null ],
     [ "ck_argmax_values_bf16_checked", "bf16__checked__tensor__ops_8c.html#ad4583f01104d9019359fc803d7472bfc", null ],
     [ "ck_geglu_tanh_bf16_checked", "bf16__checked__tensor__ops_8c.html#a89a37a5409386887648f4084eb6397c2", null ],
+    [ "ck_narrow_f32_bf16_checked", "bf16__checked__tensor__ops_8c.html#a7e71c822effc18e5b1a2fd39b876ea3b", null ],
     [ "ck_rope_interleaved_partial_bf16_checked", "bf16__checked__tensor__ops_8c.html#aaa8aaf22a43de37b9aa9ca5bb8439674", null ],
     [ "ck_rope_split_positions_bf16_checked", "bf16__checked__tensor__ops_8c.html#a84461965cd00d074d1125c8281623b00", null ],
     [ "ck_scale_bf16_checked", "bf16__checked__tensor__ops_8c.html#aec2f1df16f3e6584e7e0ac97a980b174", null ],

@@ -129,16 +129,17 @@ $(function(){initNavTree('diffusion__vp__step_8c.html','',''); });
 <div class="textblock"><code>#include &lt;math.h&gt;</code><br />
 <code>#include &lt;stddef.h&gt;</code><br />
 <code>#include &lt;stdint.h&gt;</code><br />
+<code>#include &quot;<a class="el" href="diffusion__vp__common_8h_source.html">diffusion_vp_common.h</a>&quot;</code><br />
 </div>
 <p><a href="diffusion__vp__step_8c_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:af5b5867a893b9cad2b240204a5080200" id="r_af5b5867a893b9cad2b240204a5080200"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#af5b5867a893b9cad2b240204a5080200">ck_diffusion_vp_ddpm_step_f64</a> (const double *latent, const double *estimate, const double *noise, double *output, size_t <a class="el" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>, double gamma_from, double gamma_to)</td></tr>
+<tr class="memitem:a822980b39f40362d3eada6f9b081cb78" id="r_a822980b39f40362d3eada6f9b081cb78"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a822980b39f40362d3eada6f9b081cb78">ck_diffusion_vp_ddpm_step_schedule_f64</a> (const double *latent, const double *estimate, const double *noise, const double *gamma, double *output, size_t <a class="el" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>, size_t gamma_elements)</td></tr>
 <tr class="memitem:ace48aad3efe5a4a457c27acdc64244c1" id="r_ace48aad3efe5a4a457c27acdc64244c1"><td class="memItemLeft" align="right" valign="top">static double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ace48aad3efe5a4a457c27acdc64244c1">vp_blend</a> (double z, double estimate, double noise, double residual_gain, double estimate_gain, double noise_gain)</td></tr>
 <tr class="memitem:a254b0f2e76181c73f94422cef68e7113" id="r_a254b0f2e76181c73f94422cef68e7113"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a254b0f2e76181c73f94422cef68e7113">vp_overlaps</a> (const double *a, const double *b, size_t bytes)</td></tr>
 <tr class="memitem:a2ca9765b46a02750d8b2debad8c1f37f" id="r_a2ca9765b46a02750d8b2debad8c1f37f"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a2ca9765b46a02750d8b2debad8c1f37f">vp_region_valid</a> (const double *data, size_t <a class="el" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>)</td></tr>
-<tr class="memitem:ac33c08aa7f3cd36db1fd04352826b48b" id="r_ac33c08aa7f3cd36db1fd04352826b48b"><td class="memItemLeft" align="right" valign="top">static double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ac33c08aa7f3cd36db1fd04352826b48b">vp_sigmoid</a> (double x)</td></tr>
 </table>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Function Documentation</h2>
 <a id="af5b5867a893b9cad2b240204a5080200" name="af5b5867a893b9cad2b240204a5080200"></a>
@@ -185,43 +186,102 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="diffusion__vp__step_8c_source.html#l00036">36</a> of file <a class="el" href="diffusion__vp__step_8c_source.html">diffusion_vp_step.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   39</span>{</div>
-<div class="line"><span class="lineno">   40</span>    <span class="keywordflow">if</span> (!<a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> || !isfinite(gamma_from) || !isfinite(gamma_to) ||</div>
-<div class="line"><span class="lineno">   41</span>        gamma_from &lt; gamma_to || !<a class="code hl_function" href="#a2ca9765b46a02750d8b2debad8c1f37f">vp_region_valid</a>(latent, <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>) ||</div>
-<div class="line"><span class="lineno">   42</span>        !<a class="code hl_function" href="#a2ca9765b46a02750d8b2debad8c1f37f">vp_region_valid</a>(estimate, <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>) || !<a class="code hl_function" href="#a2ca9765b46a02750d8b2debad8c1f37f">vp_region_valid</a>(noise, <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>) ||</div>
-<div class="line"><span class="lineno">   43</span>        !<a class="code hl_function" href="#a2ca9765b46a02750d8b2debad8c1f37f">vp_region_valid</a>(output, <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>)) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   44</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> bytes = <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> * <span class="keyword">sizeof</span>(double);</div>
-<div class="line"><span class="lineno">   45</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="#a254b0f2e76181c73f94422cef68e7113">vp_overlaps</a>(output, latent, bytes) || <a class="code hl_function" href="#a254b0f2e76181c73f94422cef68e7113">vp_overlaps</a>(output, estimate, bytes) ||</div>
-<div class="line"><span class="lineno">   46</span>        <a class="code hl_function" href="#a254b0f2e76181c73f94422cef68e7113">vp_overlaps</a>(output, noise, bytes)) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   47</span> </div>
-<div class="line"><span class="lineno">   48</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> from = <a class="code hl_function" href="#ac33c08aa7f3cd36db1fd04352826b48b">vp_sigmoid</a>(-gamma_from);</div>
-<div class="line"><span class="lineno">   49</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> to = <a class="code hl_function" href="#ac33c08aa7f3cd36db1fd04352826b48b">vp_sigmoid</a>(-gamma_to);</div>
-<div class="line"><span class="lineno">   50</span>    <span class="keywordflow">if</span> (from &lt;= 0.0 || to &lt;= 0.0) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   51</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> blend = -expm1(gamma_to - gamma_from);</div>
-<div class="line"><span class="lineno">   52</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> residual_gain = (1.0 - blend) * sqrt(to / from);</div>
-<div class="line"><span class="lineno">   53</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> estimate_gain = blend * sqrt(to);</div>
-<div class="line"><span class="lineno">   54</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> noise_gain = sqrt(blend * (1.0 - to));</div>
-<div class="line"><span class="lineno">   55</span>    <span class="keywordflow">if</span> (!isfinite(residual_gain) || !isfinite(estimate_gain) || !isfinite(noise_gain)) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   56</span> </div>
+<p class="definition">Definition at line <a class="el" href="diffusion__vp__step_8c_source.html#l00031">31</a> of file <a class="el" href="diffusion__vp__step_8c_source.html">diffusion_vp_step.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   34</span>{</div>
+<div class="line"><span class="lineno">   35</span>    <span class="keywordflow">if</span> (!<a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> || !isfinite(gamma_from) || !isfinite(gamma_to) ||</div>
+<div class="line"><span class="lineno">   36</span>        gamma_from &lt; gamma_to || !<a class="code hl_function" href="#a2ca9765b46a02750d8b2debad8c1f37f">vp_region_valid</a>(latent, <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>) ||</div>
+<div class="line"><span class="lineno">   37</span>        !<a class="code hl_function" href="#a2ca9765b46a02750d8b2debad8c1f37f">vp_region_valid</a>(estimate, <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>) || !<a class="code hl_function" href="#a2ca9765b46a02750d8b2debad8c1f37f">vp_region_valid</a>(noise, <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>) ||</div>
+<div class="line"><span class="lineno">   38</span>        !<a class="code hl_function" href="#a2ca9765b46a02750d8b2debad8c1f37f">vp_region_valid</a>(output, <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   39</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> bytes = <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> * <span class="keyword">sizeof</span>(double);</div>
+<div class="line"><span class="lineno">   40</span>    <span class="keywordflow">if</span> (<a class="code hl_function" href="#a254b0f2e76181c73f94422cef68e7113">vp_overlaps</a>(output, latent, bytes) || <a class="code hl_function" href="#a254b0f2e76181c73f94422cef68e7113">vp_overlaps</a>(output, estimate, bytes) ||</div>
+<div class="line"><span class="lineno">   41</span>        <a class="code hl_function" href="#a254b0f2e76181c73f94422cef68e7113">vp_overlaps</a>(output, noise, bytes)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   42</span> </div>
+<div class="line"><span class="lineno">   43</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> from = <a class="code hl_function" href="diffusion__vp__common_8h.html#ac33c08aa7f3cd36db1fd04352826b48b">vp_sigmoid</a>(-gamma_from);</div>
+<div class="line"><span class="lineno">   44</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> to = <a class="code hl_function" href="diffusion__vp__common_8h.html#ac33c08aa7f3cd36db1fd04352826b48b">vp_sigmoid</a>(-gamma_to);</div>
+<div class="line"><span class="lineno">   45</span>    <span class="keywordflow">if</span> (from &lt;= 0.0 || to &lt;= 0.0) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   46</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> blend = -expm1(gamma_to - gamma_from);</div>
+<div class="line"><span class="lineno">   47</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> residual_gain = (1.0 - blend) * sqrt(to / from);</div>
+<div class="line"><span class="lineno">   48</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> estimate_gain = blend * sqrt(to);</div>
+<div class="line"><span class="lineno">   49</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> noise_gain = sqrt(blend * (1.0 - to));</div>
+<div class="line"><span class="lineno">   50</span>    <span class="keywordflow">if</span> (!isfinite(residual_gain) || !isfinite(estimate_gain) || !isfinite(noise_gain)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   51</span> </div>
+<div class="line"><span class="lineno">   52</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>; ++i) {</div>
+<div class="line"><span class="lineno">   53</span>        <span class="keywordflow">if</span> (!isfinite(latent[i]) || !isfinite(estimate[i]) || !isfinite(noise[i]) ||</div>
+<div class="line"><span class="lineno">   54</span>            !isfinite(<a class="code hl_function" href="#ace48aad3efe5a4a457c27acdc64244c1">vp_blend</a>(latent[i], estimate[i], noise[i],</div>
+<div class="line"><span class="lineno">   55</span>                               residual_gain, estimate_gain, noise_gain))) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   56</span>    }</div>
 <div class="line"><span class="lineno">   57</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>; ++i) {</div>
-<div class="line"><span class="lineno">   58</span>        <span class="keywordflow">if</span> (!isfinite(latent[i]) || !isfinite(estimate[i]) || !isfinite(noise[i]) ||</div>
-<div class="line"><span class="lineno">   59</span>            !isfinite(<a class="code hl_function" href="#ace48aad3efe5a4a457c27acdc64244c1">vp_blend</a>(latent[i], estimate[i], noise[i],</div>
-<div class="line"><span class="lineno">   60</span>                               residual_gain, estimate_gain, noise_gain))) <span class="keywordflow">return</span> -1;</div>
-<div class="line"><span class="lineno">   61</span>    }</div>
-<div class="line"><span class="lineno">   62</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>; ++i) {</div>
-<div class="line"><span class="lineno">   63</span>        output[i] = <a class="code hl_function" href="#ace48aad3efe5a4a457c27acdc64244c1">vp_blend</a>(latent[i], estimate[i], noise[i],</div>
-<div class="line"><span class="lineno">   64</span>                             residual_gain, estimate_gain, noise_gain);</div>
-<div class="line"><span class="lineno">   65</span>    }</div>
-<div class="line"><span class="lineno">   66</span>    <span class="keywordflow">return</span> 0;</div>
-<div class="line"><span class="lineno">   67</span>}</div>
-<div class="ttc" id="adiffusion__vp__step_8c_html_a254b0f2e76181c73f94422cef68e7113"><div class="ttname"><a href="#a254b0f2e76181c73f94422cef68e7113">vp_overlaps</a></div><div class="ttdeci">static int vp_overlaps(const double *a, const double *b, size_t bytes)</div><div class="ttdef"><b>Definition</b> <a href="diffusion__vp__step_8c_source.html#l00019">diffusion_vp_step.c:19</a></div></div>
-<div class="ttc" id="adiffusion__vp__step_8c_html_a2ca9765b46a02750d8b2debad8c1f37f"><div class="ttname"><a href="#a2ca9765b46a02750d8b2debad8c1f37f">vp_region_valid</a></div><div class="ttdeci">static int vp_region_valid(const double *data, size_t count)</div><div class="ttdef"><b>Definition</b> <a href="diffusion__vp__step_8c_source.html#l00012">diffusion_vp_step.c:12</a></div></div>
-<div class="ttc" id="adiffusion__vp__step_8c_html_ac33c08aa7f3cd36db1fd04352826b48b"><div class="ttname"><a href="#ac33c08aa7f3cd36db1fd04352826b48b">vp_sigmoid</a></div><div class="ttdeci">static double vp_sigmoid(double x)</div><div class="ttdef"><b>Definition</b> <a href="diffusion__vp__step_8c_source.html#l00005">diffusion_vp_step.c:5</a></div></div>
-<div class="ttc" id="adiffusion__vp__step_8c_html_ace48aad3efe5a4a457c27acdc64244c1"><div class="ttname"><a href="#ace48aad3efe5a4a457c27acdc64244c1">vp_blend</a></div><div class="ttdeci">static double vp_blend(double z, double estimate, double noise, double residual_gain, double estimate_gain, double noise_gain)</div><div class="ttdef"><b>Definition</b> <a href="diffusion__vp__step_8c_source.html#l00025">diffusion_vp_step.c:25</a></div></div>
+<div class="line"><span class="lineno">   58</span>        output[i] = <a class="code hl_function" href="#ace48aad3efe5a4a457c27acdc64244c1">vp_blend</a>(latent[i], estimate[i], noise[i],</div>
+<div class="line"><span class="lineno">   59</span>                             residual_gain, estimate_gain, noise_gain);</div>
+<div class="line"><span class="lineno">   60</span>    }</div>
+<div class="line"><span class="lineno">   61</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">   62</span>}</div>
+<div class="ttc" id="adiffusion__vp__common_8h_html_ac33c08aa7f3cd36db1fd04352826b48b"><div class="ttname"><a href="diffusion__vp__common_8h.html#ac33c08aa7f3cd36db1fd04352826b48b">vp_sigmoid</a></div><div class="ttdeci">static double vp_sigmoid(double x)</div><div class="ttdef"><b>Definition</b> <a href="diffusion__vp__common_8h_source.html#l00006">diffusion_vp_common.h:6</a></div></div>
+<div class="ttc" id="adiffusion__vp__step_8c_html_a254b0f2e76181c73f94422cef68e7113"><div class="ttname"><a href="#a254b0f2e76181c73f94422cef68e7113">vp_overlaps</a></div><div class="ttdeci">static int vp_overlaps(const double *a, const double *b, size_t bytes)</div><div class="ttdef"><b>Definition</b> <a href="diffusion__vp__step_8c_source.html#l00014">diffusion_vp_step.c:14</a></div></div>
+<div class="ttc" id="adiffusion__vp__step_8c_html_a2ca9765b46a02750d8b2debad8c1f37f"><div class="ttname"><a href="#a2ca9765b46a02750d8b2debad8c1f37f">vp_region_valid</a></div><div class="ttdeci">static int vp_region_valid(const double *data, size_t count)</div><div class="ttdef"><b>Definition</b> <a href="diffusion__vp__step_8c_source.html#l00007">diffusion_vp_step.c:7</a></div></div>
+<div class="ttc" id="adiffusion__vp__step_8c_html_ace48aad3efe5a4a457c27acdc64244c1"><div class="ttname"><a href="#ace48aad3efe5a4a457c27acdc64244c1">vp_blend</a></div><div class="ttdeci">static double vp_blend(double z, double estimate, double noise, double residual_gain, double estimate_gain, double noise_gain)</div><div class="ttdef"><b>Definition</b> <a href="diffusion__vp__step_8c_source.html#l00020">diffusion_vp_step.c:20</a></div></div>
 <div class="ttc" id="atrue__bpe_8h_html_ac7f5fd4f55df36920bf0583c3516e72f"><div class="ttname"><a href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a></div><div class="ttdeci">const uint8_t size_t count</div><div class="ttdef"><b>Definition</b> <a href="true__bpe_8h_source.html#l00211">true_bpe.h:211</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="true__bpe_8h_source.html#l00211">count</a>, <a class="el" href="diffusion__vp__step_8c_source.html#l00025">vp_blend()</a>, <a class="el" href="diffusion__vp__step_8c_source.html#l00019">vp_overlaps()</a>, <a class="el" href="diffusion__vp__step_8c_source.html#l00012">vp_region_valid()</a>, and <a class="el" href="diffusion__vp__step_8c_source.html#l00005">vp_sigmoid()</a>.</p>
+<p class="reference">References <a class="el" href="true__bpe_8h_source.html#l00211">count</a>, <a class="el" href="diffusion__vp__step_8c_source.html#l00020">vp_blend()</a>, <a class="el" href="diffusion__vp__step_8c_source.html#l00014">vp_overlaps()</a>, <a class="el" href="diffusion__vp__step_8c_source.html#l00007">vp_region_valid()</a>, and <a class="el" href="diffusion__vp__common_8h_source.html#l00006">vp_sigmoid()</a>.</p>
+
+<p class="reference">Referenced by <a class="el" href="diffusion__vp__step_8c_source.html#l00065">ck_diffusion_vp_ddpm_step_schedule_f64()</a>.</p>
+
+</div>
+</div>
+<a id="a822980b39f40362d3eada6f9b081cb78" name="a822980b39f40362d3eada6f9b081cb78"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a822980b39f40362d3eada6f9b081cb78">&#9670;&#160;</a></span>ck_diffusion_vp_ddpm_step_schedule_f64()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_diffusion_vp_ddpm_step_schedule_f64 </td>
+          <td>(</td>
+          <td class="paramtype">const double *</td>          <td class="paramname"><span class="paramname"><em>latent</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const double *</td>          <td class="paramname"><span class="paramname"><em>estimate</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const double *</td>          <td class="paramname"><span class="paramname"><em>noise</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const double *</td>          <td class="paramname"><span class="paramname"><em>gamma</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">double *</td>          <td class="paramname"><span class="paramname"><em>output</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>count</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>gamma_elements</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="diffusion__vp__step_8c_source.html#l00065">65</a> of file <a class="el" href="diffusion__vp__step_8c_source.html">diffusion_vp_step.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   68</span>{</div>
+<div class="line"><span class="lineno">   69</span>    <span class="keywordflow">if</span> (gamma_elements != 2 || !<a class="code hl_function" href="#a2ca9765b46a02750d8b2debad8c1f37f">vp_region_valid</a>(gamma, 2) || !<a class="code hl_function" href="#a2ca9765b46a02750d8b2debad8c1f37f">vp_region_valid</a>(output, <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   70</span>    <span class="keyword">const</span> uintptr_t begin = (uintptr_t)gamma, out = (uintptr_t)output;</div>
+<div class="line"><span class="lineno">   71</span>    <span class="keywordflow">if</span> (begin &lt; out + <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> * <span class="keyword">sizeof</span>(<span class="keywordtype">double</span>) &amp;&amp; out &lt; begin + 2 * <span class="keyword">sizeof</span>(<span class="keywordtype">double</span>)) <span class="keywordflow">return</span> -1;</div>
+<div class="line"><span class="lineno">   72</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="#af5b5867a893b9cad2b240204a5080200">ck_diffusion_vp_ddpm_step_f64</a>(latent, estimate, noise, output, <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>, gamma[0], gamma[1]);</div>
+<div class="line"><span class="lineno">   73</span>}</div>
+<div class="ttc" id="adiffusion__vp__step_8c_html_af5b5867a893b9cad2b240204a5080200"><div class="ttname"><a href="#af5b5867a893b9cad2b240204a5080200">ck_diffusion_vp_ddpm_step_f64</a></div><div class="ttdeci">int ck_diffusion_vp_ddpm_step_f64(const double *latent, const double *estimate, const double *noise, double *output, size_t count, double gamma_from, double gamma_to)</div><div class="ttdef"><b>Definition</b> <a href="diffusion__vp__step_8c_source.html#l00031">diffusion_vp_step.c:31</a></div></div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="diffusion__vp__step_8c_source.html#l00031">ck_diffusion_vp_ddpm_step_f64()</a>, <a class="el" href="true__bpe_8h_source.html#l00211">count</a>, and <a class="el" href="diffusion__vp__step_8c_source.html#l00007">vp_region_valid()</a>.</p>
 
 </div>
 </div>
@@ -272,15 +332,15 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="diffusion__vp__step_8c_source.html#l00025">25</a> of file <a class="el" href="diffusion__vp__step_8c_source.html">diffusion_vp_step.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   27</span>{</div>
-<div class="line"><span class="lineno">   28</span>    <span class="keyword">volatile</span> <span class="keywordtype">double</span> residual = residual_gain * z;</div>
-<div class="line"><span class="lineno">   29</span>    <span class="keyword">volatile</span> <span class="keywordtype">double</span> denoised = estimate_gain * estimate;</div>
-<div class="line"><span class="lineno">   30</span>    <span class="keyword">volatile</span> <span class="keywordtype">double</span> innovation = noise_gain * noise;</div>
-<div class="line"><span class="lineno">   31</span>    <span class="keywordflow">return</span> (residual + denoised) + innovation;</div>
-<div class="line"><span class="lineno">   32</span>}</div>
+<p class="definition">Definition at line <a class="el" href="diffusion__vp__step_8c_source.html#l00020">20</a> of file <a class="el" href="diffusion__vp__step_8c_source.html">diffusion_vp_step.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   22</span>{</div>
+<div class="line"><span class="lineno">   23</span>    <span class="keyword">volatile</span> <span class="keywordtype">double</span> residual = residual_gain * z;</div>
+<div class="line"><span class="lineno">   24</span>    <span class="keyword">volatile</span> <span class="keywordtype">double</span> denoised = estimate_gain * estimate;</div>
+<div class="line"><span class="lineno">   25</span>    <span class="keyword">volatile</span> <span class="keywordtype">double</span> innovation = noise_gain * noise;</div>
+<div class="line"><span class="lineno">   26</span>    <span class="keywordflow">return</span> (residual + denoised) + innovation;</div>
+<div class="line"><span class="lineno">   27</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="diffusion__vp__step_8c_source.html#l00036">ck_diffusion_vp_ddpm_step_f64()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="diffusion__vp__step_8c_source.html#l00031">ck_diffusion_vp_ddpm_step_f64()</a>.</p>
 
 </div>
 </div>
@@ -316,13 +376,13 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="diffusion__vp__step_8c_source.html#l00019">19</a> of file <a class="el" href="diffusion__vp__step_8c_source.html">diffusion_vp_step.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   20</span>{</div>
-<div class="line"><span class="lineno">   21</span>    <span class="keywordflow">return</span> (uintptr_t)a &lt; (uintptr_t)b + bytes &amp;&amp;</div>
-<div class="line"><span class="lineno">   22</span>           (uintptr_t)b &lt; (uintptr_t)a + bytes;</div>
-<div class="line"><span class="lineno">   23</span>}</div>
+<p class="definition">Definition at line <a class="el" href="diffusion__vp__step_8c_source.html#l00014">14</a> of file <a class="el" href="diffusion__vp__step_8c_source.html">diffusion_vp_step.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   15</span>{</div>
+<div class="line"><span class="lineno">   16</span>    <span class="keywordflow">return</span> (uintptr_t)a &lt; (uintptr_t)b + bytes &amp;&amp;</div>
+<div class="line"><span class="lineno">   17</span>           (uintptr_t)b &lt; (uintptr_t)a + bytes;</div>
+<div class="line"><span class="lineno">   18</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="diffusion__vp__step_8c_source.html#l00036">ck_diffusion_vp_ddpm_step_f64()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="diffusion__vp__step_8c_source.html#l00031">ck_diffusion_vp_ddpm_step_f64()</a>.</p>
 
 </div>
 </div>
@@ -353,50 +413,16 @@ Functions</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="diffusion__vp__step_8c_source.html#l00012">12</a> of file <a class="el" href="diffusion__vp__step_8c_source.html">diffusion_vp_step.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   13</span>{</div>
-<div class="line"><span class="lineno">   14</span>    <span class="keywordflow">return</span> data &amp;&amp; (uintptr_t)data % _Alignof(<span class="keywordtype">double</span>) == 0 &amp;&amp;</div>
-<div class="line"><span class="lineno">   15</span>           <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> &lt;= SIZE_MAX / <span class="keyword">sizeof</span>(double) &amp;&amp;</div>
-<div class="line"><span class="lineno">   16</span>           (uintptr_t)data &lt;= UINTPTR_MAX - <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> * <span class="keyword">sizeof</span>(double);</div>
-<div class="line"><span class="lineno">   17</span>}</div>
+<p class="definition">Definition at line <a class="el" href="diffusion__vp__step_8c_source.html#l00007">7</a> of file <a class="el" href="diffusion__vp__step_8c_source.html">diffusion_vp_step.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">    8</span>{</div>
+<div class="line"><span class="lineno">    9</span>    <span class="keywordflow">return</span> data &amp;&amp; (uintptr_t)data % _Alignof(<span class="keywordtype">double</span>) == 0 &amp;&amp;</div>
+<div class="line"><span class="lineno">   10</span>           <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> &lt;= SIZE_MAX / <span class="keyword">sizeof</span>(double) &amp;&amp;</div>
+<div class="line"><span class="lineno">   11</span>           (uintptr_t)data &lt;= UINTPTR_MAX - <a class="code hl_variable" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a> * <span class="keyword">sizeof</span>(double);</div>
+<div class="line"><span class="lineno">   12</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="true__bpe_8h_source.html#l00211">count</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="diffusion__vp__step_8c_source.html#l00036">ck_diffusion_vp_ddpm_step_f64()</a>.</p>
-
-</div>
-</div>
-<a id="ac33c08aa7f3cd36db1fd04352826b48b" name="ac33c08aa7f3cd36db1fd04352826b48b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ac33c08aa7f3cd36db1fd04352826b48b">&#9670;&#160;</a></span>vp_sigmoid()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">double vp_sigmoid </td>
-          <td>(</td>
-          <td class="paramtype">double</td>          <td class="paramname"><span class="paramname"><em>x</em></span></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p class="definition">Definition at line <a class="el" href="diffusion__vp__step_8c_source.html#l00005">5</a> of file <a class="el" href="diffusion__vp__step_8c_source.html">diffusion_vp_step.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">    6</span>{</div>
-<div class="line"><span class="lineno">    7</span>    <span class="keywordflow">if</span> (x &gt;= 0.0) <span class="keywordflow">return</span> 1.0 / (1.0 + exp(-x));</div>
-<div class="line"><span class="lineno">    8</span>    <span class="keyword">const</span> <span class="keywordtype">double</span> e = exp(x);</div>
-<div class="line"><span class="lineno">    9</span>    <span class="keywordflow">return</span> e / (1.0 + e);</div>
-<div class="line"><span class="lineno">   10</span>}</div>
-</div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="diffusion__vp__step_8c_source.html#l00036">ck_diffusion_vp_ddpm_step_f64()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="diffusion__vp__step_8c_source.html#l00031">ck_diffusion_vp_ddpm_step_f64()</a>, and <a class="el" href="diffusion__vp__step_8c_source.html#l00065">ck_diffusion_vp_ddpm_step_schedule_f64()</a>.</p>
 
 </div>
 </div>

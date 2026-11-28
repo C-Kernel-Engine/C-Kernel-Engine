@@ -22,6 +22,8 @@ var annotated_dup =
     [ "ck_checked_frame_loop_control", "structck__checked__frame__loop__control.html", "structck__checked__frame__loop__control" ],
     [ "ck_checked_latent_loop", "structck__checked__latent__loop.html", "structck__checked__latent__loop" ],
     [ "ck_checked_range", "structck__checked__range.html", "structck__checked__range" ],
+    [ "ck_diffusion_schedule_request", "structck__diffusion__schedule__request.html", "structck__diffusion__schedule__request" ],
+    [ "ck_diffusion_step_bindings", "structck__diffusion__step__bindings.html", "structck__diffusion__step__bindings" ],
     [ "ck_flow_model", "structck__flow__model.html", "structck__flow__model" ],
     [ "ck_flow_update", "structck__flow__update.html", "structck__flow__update" ],
     [ "ck_guided_flow_request", "structck__guided__flow__request.html", "structck__guided__flow__request" ],

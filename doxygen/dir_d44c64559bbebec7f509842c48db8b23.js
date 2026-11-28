@@ -30,6 +30,7 @@ var dir_d44c64559bbebec7f509842c48db8b23 =
     [ "ckernel_audio_text_embedding.h", "ckernel__audio__text__embedding_8h.html", "ckernel__audio__text__embedding_8h" ],
     [ "ckernel_audio_zero_pad.h", "ckernel__audio__zero__pad_8h.html", "ckernel__audio__zero__pad_8h" ],
     [ "ckernel_bump_v5.h", "ckernel__bump__v5_8h.html", "ckernel__bump__v5_8h" ],
+    [ "ckernel_checked_diffusion_schedule.h", "ckernel__checked__diffusion__schedule_8h.html", "ckernel__checked__diffusion__schedule_8h" ],
     [ "ckernel_checked_frame_codec.h", "ckernel__checked__frame__codec_8h.html", "ckernel__checked__frame__codec_8h" ],
     [ "ckernel_checked_frame_loop.h", "ckernel__checked__frame__loop_8h.html", "ckernel__checked__frame__loop_8h" ],
     [ "ckernel_checked_guided_flow.h", "ckernel__checked__guided__flow_8h.html", "ckernel__checked__guided__flow_8h" ],

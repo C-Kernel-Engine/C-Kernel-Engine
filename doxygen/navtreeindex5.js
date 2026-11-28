@@ -1,5 +1,14 @@
 var NAVTREEINDEX5 =
 {
+"ck__session__v8_8h.html#a99c0690a6129f5be6fe2adeb628fb083aea15463252d26684aeee57c86a11e876":[2,0,0,12,12,2],
+"ck__session__v8_8h.html#aa364837eac8585e557f9f155b363a144":[2,0,0,12,31],
+"ck__session__v8_8h.html#ab150db94561001cdd19380fff0d5eba9":[2,0,0,12,8],
+"ck__session__v8_8h.html#ab150db94561001cdd19380fff0d5eba9abca8642a2d47294052259d93ecfdc8d9":[2,0,0,12,8,0],
+"ck__session__v8_8h.html#ab380feb3b65c157233416f68b6a0cf63":[2,0,0,12,38],
+"ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcf":[2,0,0,12,10],
+"ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa11881a1ddb44d8eab6ea353870a77a0b":[2,0,0,12,10,3],
+"ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa14f586ed52449d7e703f5d5ed84b9c2b":[2,0,0,12,10,2],
+"ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa1973e18af4ff52f5fe4e649ecf48c912":[2,0,0,12,10,4],
 "ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfa6de345e4efea7b9d129744ffb60481f4":[2,0,0,12,10,0],
 "ck__session__v8_8h.html#ab6d219efed8902e9110785e6d9920fcfaa347fe050bae06c4265ab683b3b19ca6":[2,0,0,12,10,1],
 "ck__session__v8_8h.html#abcc9951c8b5842c50e19fab18e957571":[2,0,0,12,42],
@@ -240,14 +249,5 @@ var NAVTREEINDEX5 =
 "ckernel__audio_8h.html#a24bd0e4f7fe8b2978e45b4e5cddfa9ad":[2,0,0,19,21],
 "ckernel__audio_8h.html#a28feb5877fbe5882ab5b46f59f849518":[2,0,0,19,20],
 "ckernel__audio_8h.html#a36584a0e3906919cb7a61e8580a41650":[2,0,0,19,11],
-"ckernel__audio_8h.html#a38c4b1c6b2219556b9852dcd44708c1a":[2,0,0,19,39],
-"ckernel__audio_8h.html#a3cfe264d4c0a3c1552fdcfb8ef9d5761":[2,0,0,19,43],
-"ckernel__audio_8h.html#a3dabaffd1650f760ba18262ddcf76317":[2,0,0,19,8],
-"ckernel__audio_8h.html#a4406f8086dad4484c9eefde35eda957a":[2,0,0,19,16],
-"ckernel__audio_8h.html#a4d0553f661e1a8e403ee7f78d18f6307":[2,0,0,19,6],
-"ckernel__audio_8h.html#a52ab76c3f3ce966f70b7773816bbaf7b":[2,0,0,19,5],
-"ckernel__audio_8h.html#a5f3986fca12d8ed653beccd58598c04b":[2,0,0,19,25],
-"ckernel__audio_8h.html#a6083b9c155a89f465cd92947f5b67ebe":[2,0,0,19,31],
-"ckernel__audio_8h.html#a61502effe4d4c5aa487d63a1e5f2cbe1":[2,0,0,19,26],
-"ckernel__audio_8h.html#a6a5776244c3c4f843a9cca21633a2a31":[2,0,0,19,7]
+"ckernel__audio_8h.html#a38c4b1c6b2219556b9852dcd44708c1a":[2,0,0,19,39]
 };

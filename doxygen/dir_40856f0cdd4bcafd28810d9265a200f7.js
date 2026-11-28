@@ -56,6 +56,8 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "deltanet_kernels.c", "deltanet__kernels_8c.html", "deltanet__kernels_8c" ],
     [ "depth_residual_mix_checked.c", "depth__residual__mix__checked_8c.html", "depth__residual__mix__checked_8c" ],
     [ "dequant_kernels.c", "dequant__kernels_8c.html", "dequant__kernels_8c" ],
+    [ "diffusion_inference_checked.c", "diffusion__inference__checked_8c.html", "diffusion__inference__checked_8c" ],
+    [ "diffusion_vp_common.h", "diffusion__vp__common_8h.html", "diffusion__vp__common_8h" ],
     [ "diffusion_vp_step.c", "diffusion__vp__step_8c.html", "diffusion__vp__step_8c" ],
     [ "embedding_kernels.c", "embedding__kernels_8c.html", "embedding__kernels_8c" ],
     [ "embedding_kernels_bf16.c", "embedding__kernels__bf16_8c.html", "embedding__kernels__bf16_8c" ],

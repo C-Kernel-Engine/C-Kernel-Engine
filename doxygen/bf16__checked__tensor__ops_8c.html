@@ -141,6 +141,7 @@ Functions</h2></td></tr>
 <tr class="memitem:a472f2a9fd5e6f3aca8ad4c9b5d3ba3bb" id="r_a472f2a9fd5e6f3aca8ad4c9b5d3ba3bb"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a472f2a9fd5e6f3aca8ad4c9b5d3ba3bb">ck_add_bf16_checked</a> (const uint16_t *<a class="el" href="true__bpe_8h.html#abf33d3f8e74eb48d5a4394c67ac4f1cd">left</a>, const uint16_t *<a class="el" href="true__bpe_8h.html#afb60251d57a9ee3324fbc011e4be71e9">right</a>, uint16_t *out, uint16_t *stage, size_t elements)</td></tr>
 <tr class="memitem:ad4583f01104d9019359fc803d7472bfc" id="r_ad4583f01104d9019359fc803d7472bfc"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ad4583f01104d9019359fc803d7472bfc">ck_argmax_values_bf16_checked</a> (const uint16_t *values, int32_t *index, size_t elements, size_t index_elements)</td></tr>
 <tr class="memitem:a89a37a5409386887648f4084eb6397c2" id="r_a89a37a5409386887648f4084eb6397c2"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a89a37a5409386887648f4084eb6397c2">ck_geglu_tanh_bf16_checked</a> (const uint16_t *gate, const uint16_t *up, uint16_t *out, float *stage, size_t elements)</td></tr>
+<tr class="memitem:a7e71c822effc18e5b1a2fd39b876ea3b" id="r_a7e71c822effc18e5b1a2fd39b876ea3b"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a7e71c822effc18e5b1a2fd39b876ea3b">ck_narrow_f32_bf16_checked</a> (const float *input, uint16_t *out, size_t elements)</td></tr>
 <tr class="memitem:aaa8aaf22a43de37b9aa9ca5bb8439674" id="r_aaa8aaf22a43de37b9aa9ca5bb8439674"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aaa8aaf22a43de37b9aa9ca5bb8439674">ck_rope_interleaved_partial_bf16_checked</a> (const uint16_t *input, const int32_t *positions, const float *inv_freq, uint16_t *out, uint16_t *stage, size_t tokens, size_t heads, size_t dim, size_t elements, size_t frequencies)</td></tr>
 <tr class="memitem:a84461965cd00d074d1125c8281623b00" id="r_a84461965cd00d074d1125c8281623b00"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a84461965cd00d074d1125c8281623b00">ck_rope_split_positions_bf16_checked</a> (const uint16_t *input, const int32_t *positions, const float *inv_freq, uint16_t *out, uint16_t *stage, size_t tokens, size_t heads, size_t dim, size_t elements, size_t frequencies)</td></tr>
 <tr class="memitem:aec2f1df16f3e6584e7e0ac97a980b174" id="r_aec2f1df16f3e6584e7e0ac97a980b174"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aec2f1df16f3e6584e7e0ac97a980b174">ck_scale_bf16_checked</a> (const uint16_t *input, const uint16_t *weight, uint16_t *out, uint16_t *stage, size_t elements, size_t gain_elements)</td></tr>
@@ -387,6 +388,47 @@ Functions</h2></td></tr>
 <p class="reference">References <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00082">gated_bf16()</a>, and <a class="el" href="gelu__kernels_8c_source.html#l00642">gelu_pytorch_tanh_bf16_storage()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="routed__geglu__bf16__checked_8c_source.html#l00053">routed_geglu_bf16_checked()</a>.</p>
+
+</div>
+</div>
+<a id="a7e71c822effc18e5b1a2fd39b876ea3b" name="a7e71c822effc18e5b1a2fd39b876ea3b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7e71c822effc18e5b1a2fd39b876ea3b">&#9670;&#160;</a></span>ck_narrow_f32_bf16_checked()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ck_narrow_f32_bf16_checked </td>
+          <td>(</td>
+          <td class="paramtype">const float *</td>          <td class="paramname"><span class="paramname"><em>input</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint16_t *</td>          <td class="paramname"><span class="paramname"><em>out</em></span>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">size_t</td>          <td class="paramname"><span class="paramname"><em>elements</em></span>&#160;)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00287">287</a> of file <a class="el" href="bf16__checked__tensor__ops_8c_source.html">bf16_checked_tensor_ops.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  288</span>{</div>
+<div class="line"><span class="lineno">  289</span>    <span class="keywordflow">if</span> (!elements || !<a class="code hl_function" href="#af868e5da55bbb9ac71862bcc959107a3">valid_span</a>(input, elements, 4) || !<a class="code hl_function" href="#af868e5da55bbb9ac71862bcc959107a3">valid_span</a>(out, elements, 2) ||</div>
+<div class="line"><span class="lineno">  290</span>        <a class="code hl_function" href="#a769aeb442e3b75a0ae52660878d37572">overlaps</a>(input, elements * 4, out, elements * 2))</div>
+<div class="line"><span class="lineno">  291</span>        <span class="keywordflow">return</span> -2;</div>
+<div class="line"><span class="lineno">  292</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; elements; ++i)</div>
+<div class="line"><span class="lineno">  293</span>        <span class="keywordflow">if</span> (!isfinite(<a class="code hl_function" href="bf16__utils_8h.html#a314c3970fd5e2770d19b1bb49aefcf94">bf16_to_float</a>(<a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(input[i]))))</div>
+<div class="line"><span class="lineno">  294</span>            <span class="keywordflow">return</span> -3;</div>
+<div class="line"><span class="lineno">  295</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; elements; ++i)</div>
+<div class="line"><span class="lineno">  296</span>        out[i] = <a class="code hl_function" href="bf16__utils_8h.html#a174b16a92b3a5972230d7519fc0c5aa3">float_to_bf16</a>(input[i]);</div>
+<div class="line"><span class="lineno">  297</span>    <span class="keywordflow">return</span> 0;</div>
+<div class="line"><span class="lineno">  298</span>}</div>
+</div><!-- fragment -->
+<p class="reference">References <a class="el" href="bf16__utils_8h_source.html#l00038">bf16_to_float()</a>, <a class="el" href="bf16__utils_8h_source.html#l00090">float_to_bf16()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00015">overlaps()</a>, and <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00009">valid_span()</a>.</p>
 
 </div>
 </div>
@@ -1024,7 +1066,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   18</span>           (uintptr_t)b &lt; (uintptr_t)a + abytes;</div>
 <div class="line"><span class="lineno">   19</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00021">binary_bf16()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00266">ck_argmax_values_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00194">ck_rope_interleaved_partial_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00140">ck_rope_split_positions_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00246">ck_scale_scalar_f32_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00068">ck_widen_bf16_checked()</a>, and <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00082">gated_bf16()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00021">binary_bf16()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00266">ck_argmax_values_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00287">ck_narrow_f32_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00194">ck_rope_interleaved_partial_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00140">ck_rope_split_positions_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00246">ck_scale_scalar_f32_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00068">ck_widen_bf16_checked()</a>, and <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00082">gated_bf16()</a>.</p>
 
 </div>
 </div>
@@ -1148,7 +1190,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="true__bpe_8h_source.html#l00211">count</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00021">binary_bf16()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00266">ck_argmax_values_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00194">ck_rope_interleaved_partial_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00140">ck_rope_split_positions_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00246">ck_scale_scalar_f32_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00068">ck_widen_bf16_checked()</a>, and <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00082">gated_bf16()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00021">binary_bf16()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00266">ck_argmax_values_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00287">ck_narrow_f32_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00194">ck_rope_interleaved_partial_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00140">ck_rope_split_positions_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00246">ck_scale_scalar_f32_bf16_checked()</a>, <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00068">ck_widen_bf16_checked()</a>, and <a class="el" href="bf16__checked__tensor__ops_8c_source.html#l00082">gated_bf16()</a>.</p>
 
 </div>
 </div>

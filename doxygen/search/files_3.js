@@ -8,5 +8,7 @@ var searchData=
   ['deltanet_5fkernels_2ec_5',['deltanet_kernels.c',['../deltanet__kernels_8c.html',1,'']]],
   ['depth_5fresidual_5fmix_5fchecked_2ec_6',['depth_residual_mix_checked.c',['../depth__residual__mix__checked_8c.html',1,'']]],
   ['dequant_5fkernels_2ec_7',['dequant_kernels.c',['../dequant__kernels_8c.html',1,'']]],
-  ['diffusion_5fvp_5fstep_2ec_8',['diffusion_vp_step.c',['../diffusion__vp__step_8c.html',1,'']]]
+  ['diffusion_5finference_5fchecked_2ec_8',['diffusion_inference_checked.c',['../diffusion__inference__checked_8c.html',1,'']]],
+  ['diffusion_5fvp_5fcommon_2eh_9',['diffusion_vp_common.h',['../diffusion__vp__common_8h.html',1,'']]],
+  ['diffusion_5fvp_5fstep_2ec_10',['diffusion_vp_step.c',['../diffusion__vp__step_8c.html',1,'']]]
 ];
