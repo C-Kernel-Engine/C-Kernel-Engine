@@ -1645,8 +1645,23 @@ def test_whisper_decoder_safetensors_keeps_self_and_cross_attention_distinct(
     )
 
 
-@pytest.mark.parametrize("source_model", ["qwen3_5", "fish_omni"])
-def test_qwen35_safetensors_to_bump_smoke(tmp_path: Path, source_model: str) -> None:
+def test_qwen35_rejects_ambiguous_text_tensor_namespace() -> None:
+    converter = _load_converter()
+    config = {"num_layers": 1, "embed_dim": 8, "intermediate_size": 16, "num_heads": 2}
+    headers = {
+        f"{prefix}.embed_tokens.weight": object()
+        for prefix in ("model.language_model", "language_model")
+    }
+    with pytest.raises(SystemExit, match="Ambiguous Qwen3.5 text tensor namespace"):
+        converter._qwen35_text_refs(config, headers)
+
+
+@pytest.mark.parametrize(("source_model", "namespace"), [
+    ("qwen3_5", "model.language_model"),
+    ("qwen3_5", "language_model"),
+    ("fish_omni", "model.language_model"),
+])
+def test_qwen35_safetensors_to_bump_smoke(tmp_path: Path, source_model: str, namespace: str) -> None:
     torch, st = _require_torch_safetensors()
     scaled_experts = source_model == "fish_omni"
     checkpoint = tmp_path / "qwen35"
@@ -1699,11 +1714,11 @@ def test_qwen35_safetensors_to_bump_smoke(tmp_path: Path, source_model: str) -> 
     )
 
     tensors = {
-        "model.language_model.embed_tokens.weight": torch.randn(32, 8, dtype=torch.bfloat16),
-        "model.language_model.norm.weight": torch.ones(8, dtype=torch.float32),
+        f"{namespace}.embed_tokens.weight": torch.randn(32, 8, dtype=torch.bfloat16),
+        f"{namespace}.norm.weight": torch.ones(8, dtype=torch.float32),
     }
     for layer, kind in enumerate(layer_types):
-        prefix = f"model.language_model.layers.{layer}"
+        prefix = f"{namespace}.layers.{layer}"
         tensors[f"{prefix}.input_layernorm.weight"] = torch.ones(8, dtype=torch.float32)
         tensors[f"{prefix}.post_attention_layernorm.weight"] = torch.ones(8, dtype=torch.float32)
         if scaled_experts:
