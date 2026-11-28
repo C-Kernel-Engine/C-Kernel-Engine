@@ -143,6 +143,11 @@ typedef int (*ck_model_decode_batch2_mixed_prefill_v8_fn)(
  * phase must be paired with a row-group value of one before external callers
  * use it for arbitrary token chunk boundaries. */
 typedef int (*ck_model_decode_prefill_phase_v8_fn)(int32_t token, float *logits);
+
+/* Optional checked raw-embedding entry for a model that declares this input.
+ * It advances decoder state by one row. The caller owns token-ID bookkeeping. */
+typedef int (*ck_model_decode_prepared_embedding_v8_fn)(
+    const float *embedding, size_t elements, float *logits, size_t logits_elements);
 typedef int (*ck_model_prefill_append_row_group_v8_fn)(void);
 
 #ifdef __cplusplus

@@ -4264,6 +4264,28 @@ CK_EXPORT uintptr_t ck_model_get_base_ptr(void) {{ return (uintptr_t)(g_model ? 
 # MAIN
 # =============================================================================
 
+def _emit_prepared_embedding_decode_api() -> str:
+    return '''
+/* Advance the usual decoder state from one caller-prepared embedding row. */
+CK_EXPORT int ck_model_decode_prepared_embedding(
+    const float *embedding, size_t elements, float *output, size_t output_elements) {
+    if (!g_model || !embedding || elements != EMBED_DIM ||
+        (output ? output_elements < VOCAB_SIZE : output_elements != 0) ||
+        g_model->pos < 0 || g_model->pos >= MAX_SEQ_LEN) return -1;
+    if (ck_model_cancel_requested()) return -2;
+    for (size_t i = 0; i < elements; ++i) {
+        if (!isfinite(embedding[i])) return -1;
+    }
+    memmove(g_model->bump + A_EMBEDDED_INPUT, embedding, elements * sizeof(float));
+    g_ck_skip_decode_logits = 0;
+    ck_decode_embedded(g_model);
+    if (ck_model_cancel_requested()) return -2;
+    if (output) memmove(output, g_model->logits, VOCAB_SIZE * sizeof(float));
+    return 0;
+}
+'''
+
+
 def generate(
     ir_path: Path,
     layout_path: Path,
@@ -4587,6 +4609,10 @@ static void _ck_profile_dump(void) {
             profile=profile, dump=dump, function_name=embedded_entry["name"],
             store_token=False, entry_contract=embedded_entry,
             scale_embeddings_sqrt_dim=scale_embeddings_sqrt_dim))
+        if config.get("prepared_embedding_decode"):
+            if embedded_entry["after_operations"]:
+                raise ValueError("prepared embedding decode requires an entry without visual residuals")
+            parts.append(_emit_prepared_embedding_decode_api())
     if prefill_continuation_ops is not None:
         if len(prefill_continuation_ops) != len(ops):
             raise RuntimeError(

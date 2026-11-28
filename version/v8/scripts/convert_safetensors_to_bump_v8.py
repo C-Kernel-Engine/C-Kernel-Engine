@@ -17,6 +17,7 @@ import os
 import shutil
 import struct
 import sys
+from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -693,6 +694,35 @@ def _gemma4_text_refs(config: dict[str, Any], headers: dict[str, HeaderTensor]) 
     return refs
 
 
+def _scaled_fp8_moe_refs(
+    layer: int, prefix: str, headers: dict[str, HeaderTensor], *,
+    experts: int, width: int, expert_width: int,
+) -> list[TensorRef]:
+    mlp = f"{prefix}.mlp"
+    result = []
+    for role, source in (
+        ("moe_router", "gate.weight"),
+        ("moe_shared_gate", "shared_expert.gate_proj.weight"),
+        ("moe_shared_up", "shared_expert.up_proj.weight"),
+        ("moe_shared_down", "shared_expert.down_proj.weight"),
+        ("moe_shared_router", "shared_expert_gate.weight"),
+    ):
+        key = _require_existing(headers, (f"{mlp}.{source}",), f"layer {layer} {role}")
+        result.append(TensorRef(f"layer.{layer}.{role}", (key,)))
+
+    for projection, shape in (("gate", (expert_width, width)), ("up", (expert_width, width)),
+                              ("down", (width, expert_width))):
+        names = []
+        for index in range(experts):
+            key = f"{mlp}.experts.{index}.{projection}_proj.weight"
+            names.extend((_require_existing(headers, (key,), key),
+                          _require_existing(headers, (key + "_scale_inv",), key + "_scale_inv")))
+        result.append(TensorRef(f"layer.{layer}.moe_expert_{projection}", tuple(names),
+                                dtype="bf16", shape=(experts, *shape),
+                                transform="block_scaled_e4m3fn_bf16"))
+    return result
+
+
 def _qwen35_text_refs(config: dict[str, Any], headers: dict[str, HeaderTensor]) -> list[TensorRef]:
     text = config.get("text_config") if isinstance(config.get("text_config"), dict) else config
     num_layers = int(config.get("num_layers") or config.get("num_hidden_layers") or text.get("num_hidden_layers") or 0)
@@ -709,6 +739,11 @@ def _qwen35_text_refs(config: dict[str, Any], headers: dict[str, HeaderTensor]) 
     if layer_types and len(layer_types) != num_layers:
         raise SystemExit(f"Qwen3.5 layer_types length {len(layer_types)} != num_layers {num_layers}")
 
+    scaled_experts = config.get("moe_expert_source_format") == "block_scaled_e4m3fn_128"
+    if scaled_experts:
+        experts = int(config["num_experts"])
+        expert_width = int(config["moe_intermediate_size"])
+
     refs: list[TensorRef] = [
         TensorRef("token_emb", (_require_existing(headers, (f"{prefix}embed_tokens.weight",), "token_emb"),)),
     ]
@@ -719,10 +754,17 @@ def _qwen35_text_refs(config: dict[str, Any], headers: dict[str, HeaderTensor]) 
         refs.extend([
             TensorRef(f"layer.{layer}.attn_norm", (_require_existing(headers, (f"{layer_prefix}.input_layernorm.weight",), f"layer {layer} input norm"),), dtype="fp32"),
             TensorRef(f"layer.{layer}.post_attention_norm", (_require_existing(headers, (f"{layer_prefix}.post_attention_layernorm.weight",), f"layer {layer} post attention norm"),), dtype="fp32"),
-            TensorRef(f"layer.{layer}.ffn_gate", (_require_existing(headers, (f"{layer_prefix}.mlp.gate_proj.weight",), f"layer {layer} gate_proj"),)),
-            TensorRef(f"layer.{layer}.ffn_up", (_require_existing(headers, (f"{layer_prefix}.mlp.up_proj.weight",), f"layer {layer} up_proj"),)),
-            TensorRef(f"layer.{layer}.ffn_down", (_require_existing(headers, (f"{layer_prefix}.mlp.down_proj.weight",), f"layer {layer} down_proj"),)),
         ])
+        if scaled_experts:
+            refs.extend(_scaled_fp8_moe_refs(
+                layer, layer_prefix, headers, experts=experts, width=embed_dim, expert_width=expert_width,
+            ))
+        else:
+            refs.extend([
+                TensorRef(f"layer.{layer}.ffn_gate", (_require_existing(headers, (f"{layer_prefix}.mlp.gate_proj.weight",), f"layer {layer} gate_proj"),)),
+                TensorRef(f"layer.{layer}.ffn_up", (_require_existing(headers, (f"{layer_prefix}.mlp.up_proj.weight",), f"layer {layer} up_proj"),)),
+                TensorRef(f"layer.{layer}.ffn_down", (_require_existing(headers, (f"{layer_prefix}.mlp.down_proj.weight",), f"layer {layer} down_proj"),)),
+            ])
         if layer_type in {"linear_attention", "recurrent"}:
             refs.extend([
                 TensorRef(f"layer.{layer}.attn_qkv", (_require_existing(headers, (f"{layer_prefix}.linear_attn.in_proj_qkv.weight",), f"layer {layer} recurrent qkv"),)),
@@ -1499,6 +1541,8 @@ def _qwen3vl_vision_refs(config: dict[str, Any], headers: dict[str, HeaderTensor
 def _infer_arch(hf: dict[str, Any]) -> str:
     text = hf.get("text_config") if isinstance(hf.get("text_config"), dict) else hf
     root_mt = str(hf.get("model_type") or "").lower()
+    if root_mt == "fish_omni" and text.get("model_type") == "fish_omni_text":
+        return "qwen35"
     if root_mt == "gemma4_assistant":
         return "gemma4_assistant"
     mt = str(text.get("model_type") or hf.get("model_type") or "").lower()
@@ -2962,6 +3006,32 @@ def _build_config(
                 "decoder_swiglu_storage_boundary": "pytorch_bf16_exact",
                 "decode_kv_cache_dtype": "bf16",
             })
+        if hf.get("model_type") == "fish_omni":
+            if text.get("model_type") != "fish_omni_text":
+                raise SystemExit("Fish Omni checkpoint requires a fish_omni_text backbone")
+            quant = hf.get("quantization_config")
+            if (not isinstance(quant, dict) or quant.get("quant_method") != "bsgemm-moe"
+                    or quant.get("weight_block_size") != [128, 128]):
+                raise SystemExit("Fish Omni requires the 128x128 block-scaled E4M3FN expert checkpoint")
+            experts, active, inner, shared = (int(text.get(key) or 0) for key in (
+                "num_experts", "num_experts_per_tok", "moe_intermediate_size", "shared_expert_intermediate_size"))
+            if not 1 <= active <= experts or min(inner, shared) <= 0:
+                raise SystemExit("Fish Omni checkpoint has invalid MoE geometry")
+            cfg.update({
+                "artifact_scope": "fish_omni_text_backbone",
+                "source_profile": "fish_omni_text",
+                "prepared_embedding_decode": True,
+                "moe_expert_source_format": "block_scaled_e4m3fn_128",
+                "mlp_execution_mode": "qwen35moe",
+                "n_routed_experts": experts,
+                "num_experts": experts,
+                "experts_per_tok": active,
+                "num_experts_per_tok": active,
+                "moe_intermediate_size": inner,
+                "moe_shared_expert_intermediate_size": shared,
+                "router_norm_topk_prob": bool(text.get("norm_topk_prob", True)),
+                "routed_scaling_factor": 1.0,
+            })
         cfg.update({
             key: architecture[key]
             for key in (
@@ -3126,6 +3196,24 @@ def _combined_ref_shape(ref: TensorRef, shapes: list[list[int]]) -> list[int]:
     return result
 
 
+def _scaled_fp8_matrix_refs(
+    ref: TensorRef, headers: dict[str, HeaderTensor],
+) -> tuple[tuple[str, str], ...]:
+    if ref.shape is None or len(ref.shape) != 3:
+        raise ValueError(f"{ref.ck_name}: FP8 expert ref must declare [experts, rows, columns]")
+    experts, rows, columns = ref.shape
+    if min(experts, rows, columns) < 1 or len(ref.source_names) != 2 * experts:
+        raise ValueError(f"{ref.ck_name}: expert weights and scales disagree with the declared shape")
+    scales = [(rows + 127) // 128, (columns + 127) // 128]
+    pairs = tuple(zip(ref.source_names[::2], ref.source_names[1::2], strict=True))
+    for weight, scale in pairs:
+        w, s = headers[weight], headers[scale]
+        if (w.dtype != "F8_E4M3" or w.shape != [rows, columns] or
+                s.dtype != "F32" or s.shape != scales):
+            raise ValueError(f"{ref.ck_name}: invalid block FP8 weight or scale geometry for {weight}")
+    return pairs
+
+
 def _entry_size_from_header(
     ref: TensorRef,
     headers: dict[str, HeaderTensor],
@@ -3135,6 +3223,9 @@ def _entry_size_from_header(
     if ref.synth:
         data, dt, shape = _synth_bytes(ref.synth, ref.shape or (), dtype_policy)
         return dt, len(data), shape
+    if ref.transform == "block_scaled_e4m3fn_bf16":
+        _scaled_fp8_matrix_refs(ref, headers)
+        return "bf16", 2 * math.prod(ref.shape), list(ref.shape)
     if ref.transform == "nvfp4_pack":
         if not ref.source_names or len(ref.source_names) % 2 != 0:
             raise SystemExit(f"{ref.ck_name}: NVFP4 refs require weight/scale pairs")
@@ -3279,7 +3370,10 @@ def _ignored_source_tensor(arch: str, name: str) -> str | None:
     return None
 
 
-def _build_source_audit(arch: str, headers: dict[str, HeaderTensor], refs: list[TensorRef]) -> dict[str, Any]:
+def _build_source_audit(
+    arch: str, headers: dict[str, HeaderTensor], refs: list[TensorRef], *, source_profile: str = "",
+) -> dict[str, Any]:
+    profile = _safetensors_arch_contract(source_profile)
     consumed: dict[str, list[str]] = {}
     synthetic: list[str] = []
     transforms: list[dict[str, str]] = []
@@ -3297,7 +3391,7 @@ def _build_source_audit(arch: str, headers: dict[str, HeaderTensor], refs: list[
     for name in sorted(headers):
         if name in consumed:
             continue
-        reason = _ignored_source_tensor(arch, name)
+        reason = _contract_ignored_source_tensor(profile, name) or _ignored_source_tensor(arch, name)
         if reason:
             ignored.append({"source": name, "reason": reason})
         else:
@@ -3330,6 +3424,23 @@ def _write_ref(
         data, dt, shape = _synth_bytes(ref.synth, ref.shape or (), dtype_policy)
         w.write(data)
         return dt, len(data), shape
+    if ref.transform == "block_scaled_e4m3fn_bf16":
+        import torch
+        from safetensors import safe_open
+
+        from fp8_storage_v8 import expand_block_scaled_e4m3fn
+
+        pairs = _scaled_fp8_matrix_refs(ref, headers)
+        shards = {headers[name].shard for pair in pairs for name in pair}
+        with ExitStack() as stack:
+            sources = {shard: stack.enter_context(safe_open(shard, framework="pt")) for shard in shards}
+            for weight, scale in pairs:
+                codes = sources[headers[weight].shard].get_tensor(weight).view(torch.uint8).numpy()
+                multipliers = sources[headers[scale].shard].get_tensor(scale).numpy()
+                expanded = expand_block_scaled_e4m3fn(codes, multipliers, row_block=128, column_block=128)
+                data, _, _ = _torch_to_bytes(torch.from_numpy(expanded), "bf16")
+                w.write(data)
+        return "bf16", 2 * math.prod(ref.shape), list(ref.shape)
     if ref.transform == "nvfp4_pack":
         if not ref.source_names or len(ref.source_names) % 2 != 0:
             raise SystemExit(f"{ref.ck_name}: NVFP4 refs require weight/scale pairs")
@@ -3805,6 +3916,8 @@ def main() -> int:
         arch = _infer_arch(hf)
 
     config = _build_config(model_dir, arch, args.config_template, headers)
+    if config.get("moe_expert_source_format") == "block_scaled_e4m3fn_128" and args.dtype == "fp32":
+        raise SystemExit("Block-scaled FP8 MoE expansion requires BF16 weights")
     _apply_linear_weight_runtime_config(
         config, _safetensors_arch_contract(arch), args.linear_weight_dtype
     )
@@ -3850,7 +3963,8 @@ def main() -> int:
         uniq = sorted(set(missing))
         raise SystemExit("Missing required safetensors tensors:\n  " + "\n  ".join(uniq[:80]))
 
-    audit = _build_source_audit(arch, headers, refs)
+    source_profile = config.get("source_profile", "")
+    audit = _build_source_audit(arch, headers, refs, source_profile=source_profile)
     audit_out = args.audit_out or (args.manifest_out.parent / "conversion_audit.json")
     audit_out.parent.mkdir(parents=True, exist_ok=True)
     audit_out.write_text(json.dumps(audit, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -3879,6 +3993,9 @@ def main() -> int:
         tie_word_embeddings=bool(config.get("tie_word_embeddings", True)),
         has_untied_output_weight=any(e["name"] == "output.weight" for e in entries_preview),
     )
+    kernel_overrides = _safetensors_arch_contract(source_profile).get("template_kernel_overrides", {})
+    if kernel_overrides:
+        template["kernels"] = {**template.get("kernels", {}), **kernel_overrides}
     if tokenizer_contract:
         template = _apply_tokenizer_contract_overrides(
             template,

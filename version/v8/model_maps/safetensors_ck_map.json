@@ -2,6 +2,19 @@
   "version": 1,
   "description": "Declarative safetensors-to-CK source tensor mapping. Source formats are not first-class CK runtime artifacts; they map into BUMP manifest names consumed by templates.",
   "architectures": {
+    "fish_omni_text": {
+      "template_kernel_overrides": {
+        "moe_router": "gemm_nt_bf16_pytorch_onednn_brgemm_bf16_storage",
+        "full_softmax_topk_router": "moe_softmax_topk_router_pytorch_bf16",
+        "moe_swiglu_expert_mlp": "moe_swiglu_expert_forward_bf16_stages_f32_accum",
+        "gated_shared_swiglu_expert_mlp": "moe_swiglu_shared_forward_bf16_gated"
+      },
+      "ignored_source_tensors": [
+        {"prefix": "audio_decoder.", "reason": "speech_tower_not_in_text_backbone"},
+        {"prefix": "audio_decoder_mtp.", "reason": "speech_tower_not_in_text_backbone"},
+        {"prefix": "audio_decoder_mtp_shared.", "reason": "speech_tower_not_in_text_backbone"}
+      ]
+    },
     "muse_glimmer_text": {
       "template": "muse_glimmer_text",
       "family": "muse_glimmer",
