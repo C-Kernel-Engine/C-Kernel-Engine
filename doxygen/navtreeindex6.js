@@ -1,5 +1,8 @@
 var NAVTREEINDEX6 =
 {
+"ckernel__alloc__v6_8c.html":[2,0,1,6,2],
+"ckernel__alloc__v6_8c.html#a19108c1ddea653d46840daefcf542bb5":[2,0,1,6,2,2],
+"ckernel__alloc__v6_8c.html#a34793e13c1b596328dfcc805c14381ab":[2,0,1,6,2,7],
 "ckernel__alloc__v6_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,6,2,0],
 "ckernel__alloc__v6_8c.html#a78d026646faf03ea83ff458d93f99b6a":[2,0,1,6,2,6],
 "ckernel__alloc__v6_8c.html#a9483fdd187f4e96dce86fdfa0bc060fe":[2,0,1,6,2,5],
@@ -246,8 +249,5 @@ var NAVTREEINDEX6 =
 "ckernel__codegen__v2__sections_8c.html#adff53af0cef8e05edeb43e22bdfb6691":[2,0,1,4,5,9],
 "ckernel__codegen__v2__sections_8c_source.html":[2,0,1,4,5],
 "ckernel__codegen__v2__struct_8c.html":[2,0,1,4,6],
-"ckernel__codegen__v2__struct_8c.html#a169fbc00f6c34fedc08c67f379d774d9":[2,0,1,4,6,1],
-"ckernel__codegen__v2__struct_8c.html#afb554665feda313ecad0c4578e1524ed":[2,0,1,4,6,0],
-"ckernel__codegen__v2__struct_8c_source.html":[2,0,1,4,6],
-"ckernel__codegen__v6_85_8c.html":[2,0,1,7,4]
+"ckernel__codegen__v2__struct_8c.html#a169fbc00f6c34fedc08c67f379d774d9":[2,0,1,4,6,1]
 };

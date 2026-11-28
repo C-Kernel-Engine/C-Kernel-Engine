@@ -1,5 +1,9 @@
 var NAVTREEINDEX21 =
 {
+"routed__softcapped__experts__checked_8c.html#a58ff4d23678fb87afe4bdb501b07c054":[2,0,1,1,162,6],
+"routed__softcapped__experts__checked_8c.html#a5a5d2a3a2ff6bf0e0cda4b1c334a5ade":[2,0,1,1,162,25],
+"routed__softcapped__experts__checked_8c.html#a5aba59535fd2de2ff99d3d738a0ce522":[2,0,1,1,162,28],
+"routed__softcapped__experts__checked_8c.html#a5acb7fd77f8360bb90d12da515fa7024":[2,0,1,1,162,35],
 "routed__softcapped__experts__checked_8c.html#a5bcbaa857f542bb03d7018e5563a3e58":[2,0,1,1,162,16],
 "routed__softcapped__experts__checked_8c.html#a69daa9a9c8e37d3f4125e6bee67141f9":[2,0,1,1,162,46],
 "routed__softcapped__experts__checked_8c.html#a6a5e7dbccefdf9510496dd97e41ac5ef":[2,0,1,1,162,44],
@@ -245,9 +249,5 @@ var NAVTREEINDEX21 =
 "structCKFooterOffsets.html#ab297d1de6261098375f31e149519d4d4":[1,0,41,5],
 "structCKFooterOffsets.html#ab47cf73ae4b7e7de8cf801fa9ce1dc5c":[1,0,41,4],
 "structCKFooterOffsets.html#ad4256e4d307e8deb6aadc34113d81e90":[1,0,41,9],
-"structCKFooterOffsets.html#ae734eedf274912ce617fb86c5c14cbf4":[1,0,41,7],
-"structCKHeaderOffsets.html":[1,0,42],
-"structCKHeaderOffsets.html#a09edd285803f7fecfbfe1a80ec241b23":[1,0,42,1],
-"structCKHeaderOffsets.html#a1c5c78d482920812a8353fe8b31a9038":[1,0,42,0],
-"structCKHeaderOffsets.html#a2a082e03809f5e60dc469836ec86e553":[1,0,42,5]
+"structCKFooterOffsets.html#ae734eedf274912ce617fb86c5c14cbf4":[1,0,41,7]
 };

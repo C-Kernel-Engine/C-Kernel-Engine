@@ -1,11 +1,11 @@
 <!-- TITLE: v8 Training Kernel Capability Ledger -->
 <h1>v8 training kernel capability ledger</h1>
-<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>582ef12b5c7afb116fe800b42c44985382b1e9003f9d6094006888ba22e9fb15</code>; provider maps: 605.</p>
+<p>Generated from <code>version/v8/kernel_maps/*.json</code> by <code>version/v8/scripts/build_training_capability_ledger_v8.py</code>. Source digest: <code>f68e7b498ada15ac3ac1b7769568ba7e48f6e8c617d337f80f1fcf7b2856889d</code>; provider maps: 606.</p>
 <p>This is a <strong>map inventory, not a training PASS</strong>. A backward declaration means a backward provider is registered; it does not prove matching geometry, selection by a generated circuit, or executed PyTorch parity. BF16-tagged includes storage or arithmetic tags. Quantized forward maps do not imply quantized-base gradients or QLoRA support. Direct executed evidence: <code>NOT_MEASURED_BY_MAP_INVENTORY</code>.</p>
 <p><strong>Authoring, lowering, and execution are separate.</strong> The public <code>cke.nn</code> module list below comes from its Python source. A class existing there does not establish that v8 can lower it, select a backward provider, or certify a generated training run. Exact kernel-map operation names are not automatically equivalent to Python modules.</p>
 <table class="table"><thead><tr><th>Dtype family</th><th>Provider maps</th><th>Forward or unspecified</th><th>Declared training forward</th><th>Declared backward</th><th>Backward-named without mode</th><th>Maps with registered tests</th></tr></thead><tbody>
 <tr><td>fp32-tagged</td><td>368</td><td>325</td><td>29</td><td>43</td><td>5</td><td>329</td></tr>
-<tr><td>bf16-tagged</td><td>123</td><td>118</td><td>2</td><td>5</td><td>0</td><td>104</td></tr>
+<tr><td>bf16-tagged</td><td>124</td><td>119</td><td>2</td><td>5</td><td>0</td><td>104</td></tr>
 <tr><td>quantized</td><td>88</td><td>88</td><td>0</td><td>0</td><td>0</td><td>68</td></tr>
 <tr><td>unspecified</td><td>26</td><td>26</td><td>1</td><td>0</td><td>0</td><td>20</td></tr>
 </tbody></table>
@@ -57,7 +57,7 @@
 <tr><td>bf16-tagged</td><td>layernorm</td><td>2</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>linear_rows_bf16_checked</td><td>3</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>mla_attention</td><td>2</td><td>—</td><td>—</td></tr>
-<tr><td>bf16-tagged</td><td>moe_swiglu_expert_mlp</td><td>3</td><td>—</td><td>—</td></tr>
+<tr><td>bf16-tagged</td><td>moe_swiglu_expert_mlp</td><td>4</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>moe_swiglu_packed_expert_mlp</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>narrow_f32_bf16_checked</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>bf16-tagged</td><td>partial_rope_concat</td><td>1</td><td>—</td><td>—</td></tr>
@@ -365,7 +365,7 @@
 <tr><td>unspecified</td><td>speculative_commit_or_reject</td><td>1</td><td>—</td><td>—</td></tr>
 <tr><td>unspecified</td><td>tokenizer</td><td>1</td><td>—</td><td>—</td></tr>
 </tbody></table>
-<details><summary>All 605 provider maps</summary>
+<details><summary>All 606 provider maps</summary>
 <table class="table"><thead><tr><th>Map</th><th>Provider ID</th><th>Operation</th><th>Dtype family</th><th>Backward mode</th><th>Registered test</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/adamw_update_f32.json">version/v8/kernel_maps/adamw_update_f32.json</a></td><td>adamw_update_f32</td><td>optimizer</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/add_bf16_checked.json">version/v8/kernel_maps/add_bf16_checked.json</a></td><td>add_bf16_checked</td><td>add_bf16_checked</td><td>bf16-tagged</td><td>not declared</td><td>registered</td></tr>
@@ -749,6 +749,7 @@
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_softmax_topk_router_pytorch_bf16.json">version/v8/kernel_maps/moe_softmax_topk_router_pytorch_bf16.json</a></td><td>moe_softmax_topk_router_pytorch_bf16</td><td>full_softmax_topk_router</td><td>bf16-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_backward_f32.json">version/v8/kernel_maps/moe_swiglu_expert_backward_f32.json</a></td><td>moe_swiglu_expert_backward_f32</td><td>moe_swiglu_expert_mlp</td><td>fp32-tagged</td><td>declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_forward_bf16.json">version/v8/kernel_maps/moe_swiglu_expert_forward_bf16.json</a></td><td>moe_swiglu_expert_forward_bf16</td><td>moe_swiglu_expert_mlp</td><td>bf16-tagged</td><td>not declared</td><td>not registered</td></tr>
+<tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_forward_bf16_stages_f32_accum.json">version/v8/kernel_maps/moe_swiglu_expert_forward_bf16_stages_f32_accum.json</a></td><td>moe_swiglu_expert_forward_bf16_stages_f32_accum</td><td>moe_swiglu_expert_mlp</td><td>bf16-tagged</td><td>not declared</td><td>not registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_forward_f32.json">version/v8/kernel_maps/moe_swiglu_expert_forward_f32.json</a></td><td>moe_swiglu_expert_forward_f32</td><td>moe_swiglu_expert_mlp</td><td>fp32-tagged</td><td>not declared</td><td>registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_forward_nvfp4.json">version/v8/kernel_maps/moe_swiglu_expert_forward_nvfp4.json</a></td><td>moe_swiglu_expert_forward_nvfp4</td><td>moe_swiglu_expert_mlp</td><td>quantized</td><td>not declared</td><td>not registered</td></tr>
 <tr><td><a href="https://github.com/C-Kernel-Engine/C-Kernel-Engine/blob/main/version/v8/kernel_maps/moe_swiglu_expert_forward_pytorch_bf16_storage.json">version/v8/kernel_maps/moe_swiglu_expert_forward_pytorch_bf16_storage.json</a></td><td>moe_swiglu_expert_forward_pytorch_bf16_storage</td><td>moe_swiglu_expert_mlp</td><td>bf16-tagged</td><td>not declared</td><td>not registered</td></tr>

@@ -149,6 +149,7 @@ Typedefs</h2></td></tr>
 <tr class="memitem:aa98bdf84b27cdcc60bfd0a275fd36594" id="r_aa98bdf84b27cdcc60bfd0a275fd36594"><td class="memItemLeft" align="right" valign="top">typedef int(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa98bdf84b27cdcc60bfd0a275fd36594">ck_model_decode_batch2_mixed_prefill_v8_fn</a>) (const <a class="el" href="structCKModelBatchDecodeRowV8.html">CKModelBatchDecodeRowV8</a> *rows, size_t <a class="el" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>, void *workspace, size_t workspace_bytes, uint32_t prefill_row)</td></tr>
 <tr class="memitem:a4e9c3db4e47490dbca36761726a25ad8" id="r_a4e9c3db4e47490dbca36761726a25ad8"><td class="memItemLeft" align="right" valign="top">typedef int(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a4e9c3db4e47490dbca36761726a25ad8">ck_model_decode_batch2_v8_fn</a>) (const <a class="el" href="structCKModelBatchDecodeRowV8.html">CKModelBatchDecodeRowV8</a> *rows, size_t <a class="el" href="true__bpe_8h.html#ac7f5fd4f55df36920bf0583c3516e72f">count</a>, void *workspace, size_t workspace_bytes)</td></tr>
 <tr class="memitem:ac9097f3491c1712f054a0672e5db3002" id="r_ac9097f3491c1712f054a0672e5db3002"><td class="memItemLeft" align="right" valign="top">typedef int(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ac9097f3491c1712f054a0672e5db3002">ck_model_decode_prefill_phase_v8_fn</a>) (int32_t <a class="el" href="tokenizer_8h.html#a7d3edfa508be401819bb24057b3c1be6">token</a>, float *logits)</td></tr>
+<tr class="memitem:a0a8c9685285941a3e80a3715248fe4bf" id="r_a0a8c9685285941a3e80a3715248fe4bf"><td class="memItemLeft" align="right" valign="top">typedef int(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a0a8c9685285941a3e80a3715248fe4bf">ck_model_decode_prepared_embedding_v8_fn</a>) (const float *embedding, size_t elements, float *logits, size_t logits_elements)</td></tr>
 <tr class="memitem:a5385b6e9bc0a739d8b8edd12cf376521" id="r_a5385b6e9bc0a739d8b8edd12cf376521"><td class="memItemLeft" align="right" valign="top">typedef uint32_t(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a5385b6e9bc0a739d8b8edd12cf376521">ck_model_get_abi_version_v8_fn</a>) (void)</td></tr>
 <tr class="memitem:a36dc8190afb9f8678f05368dcad38cee" id="r_a36dc8190afb9f8678f05368dcad38cee"><td class="memItemLeft" align="right" valign="top">typedef uint64_t(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a36dc8190afb9f8678f05368dcad38cee">ck_model_get_capabilities_v8_fn</a>) (void)</td></tr>
 <tr class="memitem:a0b7c6d803b4d3ae2a169e5fd8e1e448c" id="r_a0b7c6d803b4d3ae2a169e5fd8e1e448c"><td class="memItemLeft" align="right" valign="top">typedef int(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a0b7c6d803b4d3ae2a169e5fd8e1e448c">ck_model_get_runtime_descriptor_v8_fn</a>) (<a class="el" href="structCKModelRuntimeDescriptorV8.html">CKModelRuntimeDescriptorV8</a> *descriptor, size_t descriptor_size)</td></tr>
@@ -330,6 +331,22 @@ Enumerations</h2></td></tr>
 
 </div>
 </div>
+<a id="a0a8c9685285941a3e80a3715248fe4bf" name="a0a8c9685285941a3e80a3715248fe4bf"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0a8c9685285941a3e80a3715248fe4bf">&#9670;&#160;</a></span>ck_model_decode_prepared_embedding_v8_fn</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">typedef int(* ck_model_decode_prepared_embedding_v8_fn) (const float *embedding, size_t elements, float *logits, size_t logits_elements)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="ck__model__abi__v8_8h_source.html#l00149">149</a> of file <a class="el" href="ck__model__abi__v8_8h_source.html">ck_model_abi_v8.h</a>.</p>
+
+</div>
+</div>
 <a id="a5385b6e9bc0a739d8b8edd12cf376521" name="a5385b6e9bc0a739d8b8edd12cf376521"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a5385b6e9bc0a739d8b8edd12cf376521">&#9670;&#160;</a></span>ck_model_get_abi_version_v8_fn</h2>
 
@@ -406,7 +423,7 @@ Enumerations</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="ck__model__abi__v8_8h_source.html#l00146">146</a> of file <a class="el" href="ck__model__abi__v8_8h_source.html">ck_model_abi_v8.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="ck__model__abi__v8_8h_source.html#l00151">151</a> of file <a class="el" href="ck__model__abi__v8_8h_source.html">ck_model_abi_v8.h</a>.</p>
 
 </div>
 </div>

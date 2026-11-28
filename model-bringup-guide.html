@@ -2811,6 +2811,47 @@ python -m pytest -q tests/test_v8_drama3_bf16_codebook_frame.py \
      by 0.125, while both receive 21.0 in the publisher output. The replay
      retains that failure and the original isolated-weight parity gate.</p>
 
+  <h4 id="drama3-native-text-waveform">Native text, frame feedback and waveform</h4>
+  <p>The safetensors importer maps the released Fish Omni text backbone to the
+     hybrid Qwen3.5 circuit. It expands the checkpoint's 128 by 128 E4M3FN
+     expert blocks to BF16, in expert order, while writing the BUMP. The
+     conversion audit accounts for the tower tensors as a separate artifact.
+     The full text payload is about 64.6 GiB.</p>
+  <pre><code>python -m version.v8.scripts.convert_safetensors_to_bump_v8 \
+  --checkpoint /path/to/drama3 --output /path/to/bundle/weights.bump \
+  --config-out /path/to/bundle/config.json \
+  --manifest-out /path/to/bundle/weights_manifest.json</code></pre>
+  <p>Build the converted manifest through ordinary prefill and decode lowering
+     and code generation. The selected BF16 backbone providers need the pinned
+     oneDNN 3.7.1 development library and the MKL and SLEEF symbols from the
+     reference math library. Set <code>CK_ONEDNN_LIBRARY</code>,
+     <code>CK_ONEDNN_INCLUDE</code>, <code>CK_MKL_LIBRARY</code>,
+     <code>CK_SLEEF_LIBRARY</code>, and <code>CK_BLAS_LIBRARY</code> as
+     appropriate for the build and run. The mixed-backed BUMP option avoids
+     copying the entire weights artifact into anonymous memory.</p>
+  <p>When declared, the generated <code>ck_model_decode_prepared_embedding</code>
+     entry accepts one raw FP32 transport row and publishes last-token logits.
+     It checks the row and output extents, nonfinite input and context capacity
+     before decoding. The caller owns token-ID bookkeeping. The generated
+     Drama feedback circuit sends one residual embedding into the backbone and
+     sums the remaining eight in FP32 for the next tower step.</p>
+  <pre><code>python -m pytest -q tests/test_v8_drama3_feedback.py tests/test_v8_prefill_codegen.py</code></pre>
+  <p>On Ryzen, CKE generated the first two frames of <code>Hello, CKE.</code>
+     from text and matched both semantic IDs and all 20 codebook IDs from the
+     pinned publisher capture. Maximum candidate-score differences were 0.25
+     and 0.53125. The diagnostic harness used a deterministic nonrepeating
+     retry and the publisher used stochastic repetition-aware sampling. It
+     loaded the oracle only after generation.</p>
+  <p>A longer native run of the same prompt reached EOS after 41 frames and fed
+     those IDs directly to the generated codec. It produced 83,968 mono PCM
+     samples at 44.1 kHz, or 1.90 seconds of audio. Codec execution took
+     122.05 seconds with eight threads. CKE Whisper transcribed the WAV as
+     <code>Hello CKE.</code> after resampling to 16 kHz. The diagnostic harness schedules the
+     separately generated backbone, feedback, tower and codec entries.
+     The run establishes single-prompt synthesis. Published sampler parity,
+     full-model checkpoint parity and a packaged speech session remain separate
+     acceptance gates.</p>
+
   <h2 id="xray-diagnosis">11. Diagnose divergence with X-Ray</h2>
   <p>When parity fails, do not poke at tolerances. Walk the decision tree &mdash; each branch names an owner, and the fix lands in that owner's artifact (see <a href="xray.html">the X-Ray page</a> for the full evidence model and capture-neutrality gates):</p>
   <div class="mb-table"><table><thead><tr><th>Observation</th><th>Diagnosis</th><th>Repair</th></tr></thead><tbody>
