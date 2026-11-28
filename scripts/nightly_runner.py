@@ -1227,6 +1227,10 @@ TEST_SUITES = {
         "Checked Decision Tensor Operations", "kernels",
         ROOT / "tests" / "test_v8_decision_tensor_ops.py",
     ),
+    "decision_karpo_readout": TestSuite(
+        "Karpo Generated Marker Readout and Unequal Option Counts", "inference",
+        ROOT / "tests" / "test_v8_karpo_readout.py", pytest=True,
+    ),
     "decision_clef_flash_complete_head": TestSuite(
         "Clef-Flash Complete Generated Decision Head", "inference",
         ROOT / "tests" / "test_v8_clef_flash_complete_head.py",

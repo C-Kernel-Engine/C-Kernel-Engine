@@ -9,4 +9,7 @@ int ck_indexed_cosine_rows_f32(const float *left, size_t left_elements, const fl
 int ck_scalar_exp_clamped_f32(const float *input, size_t input_elements, float *output, size_t output_elements, float maximum);
 int ck_scalar_sigmoid_f32(const float *input, size_t input_elements, float *output, size_t output_elements);
 int ck_scale_vector_f32(const float *input, size_t input_elements, const float *gain, size_t gain_elements, float *output, size_t output_elements, float *scratch, size_t scratch_elements, size_t rows);
+int ck_prefix_softmax_rows_f32(const float *logits, size_t logits_elements,
+    const int32_t *counts, size_t count_elements, float *output, size_t output_elements,
+    size_t rows, size_t columns);
 #endif
