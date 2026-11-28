@@ -6976,6 +6976,7 @@ enum {
     CK_REGULAR_DECODE_MIN_WINDOW = 64,
     CK_REGULAR_DECODE_MIN_HEAD_DIM = 128,
     CK_REGULAR_DECODE_MIN_WORK = 131072,
+    CK_REGULAR_DECODE_MAX_CACHED_SCORES = 16384,
 };
 
 typedef struct {
@@ -6988,6 +6989,7 @@ typedef struct {
     int tokens;
     int head_dim;
     int stride;
+    int reuse_scores;
 } ck_regular_decode_args_t;
 
 static ck_attention_status_t ck_attention_regular_decode_head(
@@ -7004,17 +7006,22 @@ static ck_attention_status_t ck_attention_regular_decode_head(
     uint16_t *q_half = (uint16_t *)alloca((size_t)head_dim * sizeof(uint16_t));
     for (int d = 0; d < head_dim; ++d) q_half[d] = CK_FP32_TO_FP16(q_head[d]);
 
+    const int visible = kv_tokens - first_token;
+    /* Reuse the FP32 scores without changing either softmax reduction pass. */
+    float *scores = args->reuse_scores && visible <= CK_REGULAR_DECODE_MAX_CACHED_SCORES
+        ? (float *)alloca((size_t)visible * sizeof(float)) : NULL;
     float maximum = -INFINITY;
     for (int token = first_token; token < kv_tokens; ++token) {
         const float score = ck_attention_dot_f16_llama(
             q_half, k_head + (size_t) token * (size_t) aligned_head_dim, head_dim);
+        if (scores) scores[token - first_token] = score;
         if (score > maximum) maximum = score;
     }
     if (!isfinite(maximum)) return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
 
     double total = 0.0;
     for (int token = first_token; token < kv_tokens; ++token) {
-        const float score = ck_attention_dot_f16_llama(
+        const float score = scores ? scores[token - first_token] : ck_attention_dot_f16_llama(
             q_half, k_head + (size_t) token * (size_t) aligned_head_dim, head_dim);
         total += (double) ck_attention_reference_expf(score - maximum);
     }
@@ -7022,7 +7029,7 @@ static ck_attention_status_t ck_attention_regular_decode_head(
 
     for (int d = 0; d < head_dim; ++d) out_head[d] = 0.0f;
     for (int token = first_token; token < kv_tokens; ++token) {
-        const float score = ck_attention_dot_f16_llama(
+        const float score = scores ? scores[token - first_token] : ck_attention_dot_f16_llama(
             q_half, k_head + (size_t) token * (size_t) aligned_head_dim, head_dim);
         const float probability = ck_attention_reference_expf(score - maximum) / (float) total;
         const float rounded_probability = CK_FP16_TO_FP32(CK_FP32_TO_FP16(probability));
@@ -7098,12 +7105,14 @@ ck_attention_status_t attention_forward_decode_head_major_gqa_f16cache_regular_n
 
     const int first_token = sliding_window > 0 && kv_tokens > sliding_window
         ? kv_tokens - sliding_window : 0;
+    const char *score_policy = getenv("CK_EXPERIMENT_REGULAR_FP16_CACHE_SCORES");
     const ck_regular_decode_args_t args = {
         .q = q_token, .k = k_cache, .v = v_cache,
         .kv_stride = (size_t)cache_capacity * (size_t)aligned_head_dim,
         .group_size = num_heads / num_kv_heads,
         .first_token = first_token, .tokens = kv_tokens,
         .head_dim = head_dim, .stride = aligned_head_dim,
+        .reuse_scores = score_policy && strcmp(score_policy, "1") == 0,
     };
     if (num_heads > 1 && num_heads <= CK_REGULAR_DECODE_MAX_HEADS &&
         aligned_head_dim <= CK_REGULAR_DECODE_STAGE_FLOATS / num_heads &&

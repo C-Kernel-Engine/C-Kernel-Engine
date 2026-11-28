@@ -930,6 +930,12 @@ make test-v8-arm-model-smoke CK_ARM_MODEL_DIR=/path/to/generated-v8-model</pre><
         calls already inside the pool use serial execution. Each head keeps its original arithmetic.
         <code>CK_DISABLE_ATTENTION_THREADPOOL=1</code> restores serial execution for comparisons.
         <code>CK_ATTENTION_THREAD_CAP</code> limits the participating workers.</p>
+    <p class="mini-note">For long-context regular FP16 decode experiments, launch with
+        <code>CK_EXPERIMENT_REGULAR_FP16_CACHE_SCORES=1</code> to retain each query head’s
+        dot products across the softmax passes. This uses up to 64 KiB of temporary scores
+        per executing head. Above 16,384 visible positions it recomputes scores.
+        The default is recomputation. On the Ryzen Gemma 4 E4B Q4_K_M 8K replay,
+        score reuse saved about 3 ms per decode token with exact logits and state.</p>
     <p class="mini-note">For packed-Q4 prefill experiments, set <code>CK_EXPERIMENT_Q4K_TILE_SCHEDULE</code> to <code>contiguous</code>, <code>grain4</code>, or <code>whole-group</code> before launching the runtime. The override applies to the eight-output AVX2 and VNNI tiled prefill providers. Unset the variable for the existing schedule. Use <code>CK_DEBUG_Q4K_PREFILL_DISPATCH=1</code> in a separate untimed run to verify the selected provider, active worker count, and claim size.</p>
 
     <h3>Gemma 4 Assistant / MTP Drafter</h3>
