@@ -582,11 +582,11 @@ void moe_swiglu_expert_forward_bf16(const float *hidden,
 /* Publisher-style BF16 storage after each expert stage. Routing weights stay
  * FP32; the weighted result is stored to BF16 before each BF16 accumulation.
  * Expert-index order matches the reference's expert-major index_add loop. */
-void moe_swiglu_expert_forward_pytorch_bf16_storage(
+static void ck_moe_swiglu_bf16_stages(
     const float *hidden, const int *indices, const float *routing_weights,
     const uint16_t *expert_gate, const uint16_t *expert_up,
     const uint16_t *expert_down, float *output, int rows, int hidden_dim,
-    int intermediate_dim, int n_experts, int top_k)
+    int intermediate_dim, int n_experts, int top_k, int fp32_accum)
 {
     if (!hidden || !indices || !routing_weights || !expert_gate ||
         !expert_up || !expert_down || !output || rows <= 0 ||
@@ -636,13 +636,41 @@ void moe_swiglu_expert_forward_pytorch_bf16_storage(
                              activation[i];
                     }
                     const float down_stored = ck_moe_bf16_round(v);
-                    const float weighted_stored =
-                        ck_moe_bf16_round(down_stored * route_w);
-                    y[h] = ck_moe_bf16_round(y[h] + weighted_stored);
+                    const float weighted = down_stored * route_w;
+                    if (fp32_accum) {
+                        y[h] += weighted;
+                    } else {
+                        y[h] = ck_moe_bf16_round(y[h] + ck_moe_bf16_round(weighted));
+                    }
                 }
             }
         }
+        if (fp32_accum) {
+            for (int h = 0; h < hidden_dim; ++h) y[h] = ck_moe_bf16_round(y[h]);
+        }
     }
+}
+
+void moe_swiglu_expert_forward_pytorch_bf16_storage(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const uint16_t *expert_gate, const uint16_t *expert_up,
+    const uint16_t *expert_down, float *output, int rows, int hidden_dim,
+    int intermediate_dim, int n_experts, int top_k)
+{
+    ck_moe_swiglu_bf16_stages(hidden, indices, routing_weights, expert_gate,
+                             expert_up, expert_down, output, rows, hidden_dim,
+                             intermediate_dim, n_experts, top_k, 0);
+}
+
+void moe_swiglu_expert_forward_bf16_stages_f32_accum(
+    const float *hidden, const int *indices, const float *routing_weights,
+    const uint16_t *expert_gate, const uint16_t *expert_up,
+    const uint16_t *expert_down, float *output, int rows, int hidden_dim,
+    int intermediate_dim, int n_experts, int top_k)
+{
+    ck_moe_swiglu_bf16_stages(hidden, indices, routing_weights, expert_gate,
+                             expert_up, expert_down, output, rows, hidden_dim,
+                             intermediate_dim, n_experts, top_k, 1);
 }
 
 /* Group all rows routed to an expert before its oneDNN projections. PyTorch's

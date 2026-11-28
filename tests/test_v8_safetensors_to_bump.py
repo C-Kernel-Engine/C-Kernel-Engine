@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import io
 import ctypes
 import json
 import math
@@ -26,6 +27,38 @@ def _load_converter():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def test_block_scaled_fp8_experts_write_bf16_in_expert_order(tmp_path: Path) -> None:
+    torch = pytest.importorskip("torch")
+    safetensors = pytest.importorskip("safetensors.torch")
+    converter = _load_converter()
+    weights = torch.full((2, 130), 1.5).to(torch.float8_e4m3fn)
+    scales = (torch.tensor([[0.5, 2.0]]), torch.tensor([[1.0, 4.0]]))
+    source = {}
+    for expert, scale in enumerate(scales):
+        source[f"expert.{expert}.weight"] = weights
+        source[f"expert.{expert}.scale"] = scale
+    safetensors.save_file({key: value.clone() for key, value in source.items()},
+                          tmp_path / "model.safetensors")
+    headers = converter._load_safetensors_headers(tmp_path)
+    ref = converter.TensorRef(
+        "layer.0.moe_expert_gate", tuple(source), dtype="bf16",
+        shape=(2, 2, 130), transform="block_scaled_e4m3fn_bf16",
+    )
+    expected = torch.stack([
+        (weights.float() * scale.repeat_interleave(128, dim=1)[:, :130]).bfloat16()
+        for scale in scales
+    ])
+    buffer = io.BytesIO()
+    header = converter._entry_size_from_header(ref, headers, "preserve")
+    assert header == ("bf16", expected.numel() * expected.element_size(), [2, 2, 130])
+    assert converter._write_ref(buffer, tmp_path, headers, ref, "preserve", "qwen35") == header
+    assert buffer.getvalue() == expected.view(torch.uint16).numpy().tobytes()
+
+    headers["expert.1.scale"].shape = [2, 1]
+    with pytest.raises(ValueError, match="invalid block FP8 weight or scale geometry"):
+        converter._entry_size_from_header(ref, headers, "preserve")
 
 
 def test_unimplemented_checkpoint_overrides_fail_before_loading_weights(tmp_path: Path) -> None:
@@ -1612,8 +1645,10 @@ def test_whisper_decoder_safetensors_keeps_self_and_cross_attention_distinct(
     )
 
 
-def test_qwen35_safetensors_to_bump_smoke(tmp_path: Path) -> None:
+@pytest.mark.parametrize("source_model", ["qwen3_5", "fish_omni"])
+def test_qwen35_safetensors_to_bump_smoke(tmp_path: Path, source_model: str) -> None:
     torch, st = _require_torch_safetensors()
+    scaled_experts = source_model == "fish_omni"
     checkpoint = tmp_path / "qwen35"
     out = tmp_path / "out_qwen35"
     checkpoint.mkdir()
@@ -1624,10 +1659,14 @@ def test_qwen35_safetensors_to_bump_smoke(tmp_path: Path) -> None:
         json.dumps(
             {
                 "architectures": ["Qwen3_5ForConditionalGeneration"],
-                "model_type": "qwen3_5",
+                "model_type": source_model,
+                **({"quantization_config": {"quant_method": "bsgemm-moe", "weight_block_size": [128, 128]}}
+                   if scaled_experts else {}),
                 "tie_word_embeddings": True,
                 "text_config": {
-                    "model_type": "qwen3_5_text",
+                    "model_type": f"{source_model}_text",
+                    **({"num_experts": 2, "num_experts_per_tok": 1, "moe_intermediate_size": 16,
+                        "shared_expert_intermediate_size": 16} if scaled_experts else {}),
                     "num_hidden_layers": 4,
                     "hidden_size": 8,
                     "intermediate_size": 16,
@@ -1667,9 +1706,20 @@ def test_qwen35_safetensors_to_bump_smoke(tmp_path: Path) -> None:
         prefix = f"model.language_model.layers.{layer}"
         tensors[f"{prefix}.input_layernorm.weight"] = torch.ones(8, dtype=torch.float32)
         tensors[f"{prefix}.post_attention_layernorm.weight"] = torch.ones(8, dtype=torch.float32)
-        tensors[f"{prefix}.mlp.gate_proj.weight"] = torch.randn(16, 8, dtype=torch.bfloat16)
-        tensors[f"{prefix}.mlp.up_proj.weight"] = torch.randn(16, 8, dtype=torch.bfloat16)
-        tensors[f"{prefix}.mlp.down_proj.weight"] = torch.randn(8, 16, dtype=torch.bfloat16)
+        if scaled_experts:
+            mlp = f"{prefix}.mlp"
+            tensors[f"{mlp}.gate.weight"] = torch.ones(2, 8, dtype=torch.bfloat16)
+            tensors[f"{mlp}.shared_expert_gate.weight"] = torch.ones(1, 8, dtype=torch.bfloat16)
+            for projection, shape in (("gate", (16, 8)), ("up", (16, 8)), ("down", (8, 16))):
+                tensors[f"{mlp}.shared_expert.{projection}_proj.weight"] = torch.ones(shape, dtype=torch.bfloat16)
+                for expert in range(2):
+                    key = f"{mlp}.experts.{expert}.{projection}_proj.weight"
+                    tensors[key] = torch.full(shape, expert + 1.0).to(torch.float8_e4m3fn)
+                    tensors[key + "_scale_inv"] = torch.ones(1, 1)
+        else:
+            tensors[f"{prefix}.mlp.gate_proj.weight"] = torch.randn(16, 8, dtype=torch.bfloat16)
+            tensors[f"{prefix}.mlp.up_proj.weight"] = torch.randn(16, 8, dtype=torch.bfloat16)
+            tensors[f"{prefix}.mlp.down_proj.weight"] = torch.randn(8, 16, dtype=torch.bfloat16)
         if kind == "linear_attention":
             tensors[f"{prefix}.linear_attn.in_proj_qkv.weight"] = torch.randn(24, 8, dtype=torch.bfloat16)
             tensors[f"{prefix}.linear_attn.in_proj_z.weight"] = torch.randn(8, 8, dtype=torch.bfloat16)
@@ -1688,6 +1738,8 @@ def test_qwen35_safetensors_to_bump_smoke(tmp_path: Path) -> None:
             tensors[f"{prefix}.self_attn.q_norm.weight"] = torch.ones(4, dtype=torch.float32)
             tensors[f"{prefix}.self_attn.k_norm.weight"] = torch.ones(4, dtype=torch.float32)
 
+    if scaled_experts:
+        tensors["audio_decoder.codebook_embeddings.weight"] = torch.zeros(1, 8, dtype=torch.bfloat16)
     st.save_file(tensors, checkpoint / "model.safetensors")
 
     script = Path("version/v8/scripts/convert_safetensors_to_bump_v8.py")
@@ -1721,6 +1773,19 @@ def test_qwen35_safetensors_to_bump_smoke(tmp_path: Path) -> None:
     assert any(row["target"] == "layer.3.attn_q_norm" and row["transform"] == "qwen35_norm_plus_one" for row in audit["transforms"])
     assert any(row["target"] == "final_ln_weight" and row["transform"] == "qwen35_norm_plus_one" for row in audit["transforms"])
     assert not any(row["target"] == "layer.0.ssm_norm" and row.get("transform") == "qwen35_norm_plus_one" for row in audit["transforms"])
+    if scaled_experts:
+        assert config["artifact_scope"] == "fish_omni_text_backbone"
+        assert config["mlp_execution_mode"] == "qwen35moe"
+        assert config["num_experts"] == 2 and config["num_experts_per_tok"] == 1
+        assert "layer.0.ffn_gate" not in names
+        assert "layer.0.moe_expert_gate" in names
+        assert manifest["template"]["kernels"]["moe_swiglu_expert_mlp"] == (
+            "moe_swiglu_expert_forward_bf16_stages_f32_accum"
+        )
+        assert audit["ignored_source_tensors"] == [{
+            "source": "audio_decoder.codebook_embeddings.weight",
+            "reason": "speech_tower_not_in_text_backbone",
+        }]
     assert config["layer_kinds"] == ["recurrent", "recurrent", "recurrent", "full_attention"]
     assert config["layer_recurrent_policy"] == ["deltanet", "deltanet", "deltanet", "none"]
     assert config["attn_q_gate_proj_dim"] == 16

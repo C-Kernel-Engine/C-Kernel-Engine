@@ -2812,7 +2812,13 @@ def main(argv: list[str] | None = None) -> int:
                 and "multimodal_bridge_contract" in (ir_obj.get("config") or {})))
         entry_config = dict(ir_obj.get("config") or {})
         entry_config.update(layout_obj.get("config") or {})
-        if requires_embedded_entry and str(entry_config.get("logits_layout", "")).lower() == "last":
+        prepared_embedding = entry_config.get("prepared_embedding_decode", False)
+        if type(prepared_embedding) is not bool:
+            raise ValueError("prepared_embedding_decode must be a boolean")
+        last_logits = str(entry_config.get("logits_layout", "")).lower() == "last"
+        if prepared_embedding and not last_logits:
+            raise ValueError("prepared embedding decode requires last-token logits")
+        if (requires_embedded_entry or prepared_embedding) and last_logits:
             from embedded_entry_contract_v8 import plan_embedded_decode_entry
             core_ir_obj = dict(core_ir_obj)
             core_ir_obj["embedded_decode_entry"] = plan_embedded_decode_entry(

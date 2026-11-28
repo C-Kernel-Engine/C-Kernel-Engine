@@ -28,7 +28,7 @@ def bits(values):
     return (bf16(values).view(np.uint32) >> 16).astype(np.uint16)
 
 
-def reference(hidden, indices, routing, gate, up, down):
+def reference(hidden, indices, routing, gate, up, down, *, fp32_accum=False):
     rows, width = hidden.shape
     intermediate = gate.shape[1]
     out = np.zeros((rows, width), dtype=np.float32)
@@ -45,9 +45,12 @@ def reference(hidden, indices, routing, gate, up, down):
                 activated = bf16(silu * up_value)
                 assert activated.shape == (intermediate,)
                 projected = bf16(down[expert] @ activated)
-                weighted = bf16(projected * routing[row, slot])
-                out[row] = bf16(out[row] + weighted)
-    return out
+                weighted = projected * routing[row, slot]
+                if fp32_accum:
+                    out[row] += weighted
+                else:
+                    out[row] = bf16(out[row] + bf16(weighted))
+    return bf16(out)
 
 
 class MoEBf16StageStorageTest(unittest.TestCase):
@@ -92,6 +95,12 @@ class MoEBf16StageStorageTest(unittest.TestCase):
         actual = call("moe_swiglu_expert_forward_pytorch_bf16_storage")
         np.testing.assert_array_equal(actual, expected)
         np.testing.assert_array_equal(actual, bf16(actual))
+
+        fp32_accum = call("moe_swiglu_expert_forward_bf16_stages_f32_accum")
+        np.testing.assert_array_equal(
+            fp32_accum, reference(hidden, indices, routing, gate, up, down, fp32_accum=True),
+        )
+        self.assertFalse(np.array_equal(fp32_accum, expected))
 
         # The old provider intentionally keeps FP32 intermediates. This fixture
         # must detect selecting that different numerical contract.

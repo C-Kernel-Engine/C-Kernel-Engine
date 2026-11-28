@@ -1,0 +1,156 @@
+{
+  "id": "moe_swiglu_expert_forward_bf16_stages_f32_accum",
+  "op": "moe_swiglu_expert_mlp",
+  "variant": "bf16_weight_bf16_stage_storage_fp32_accum",
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "quant": {
+    "weight": "bf16",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "hidden",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "H"
+      ]
+    },
+    {
+      "name": "indices",
+      "dtype": "i32",
+      "shape": [
+        "R",
+        "K"
+      ]
+    },
+    {
+      "name": "routing_weights",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "K"
+      ]
+    }
+  ],
+  "weights": [
+    {
+      "name": "expert_gate",
+      "dtype": "bf16",
+      "shape": [
+        "E",
+        "I",
+        "H"
+      ]
+    },
+    {
+      "name": "expert_up",
+      "dtype": "bf16",
+      "shape": [
+        "E",
+        "I",
+        "H"
+      ]
+    },
+    {
+      "name": "expert_down",
+      "dtype": "bf16",
+      "shape": [
+        "E",
+        "H",
+        "I"
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "H"
+      ]
+    }
+  ],
+  "dims": [
+    "R",
+    "H",
+    "I",
+    "E",
+    "K"
+  ],
+  "impl": {
+    "function": "moe_swiglu_expert_forward_bf16_stages_f32_accum",
+    "c_declaration": "void moe_swiglu_expert_forward_bf16_stages_f32_accum(const float *hidden, const int *indices, const float *routing_weights, const uint16_t *expert_gate, const uint16_t *expert_up, const uint16_t *expert_down, float *output, int rows, int hidden_dim, int intermediate_dim, int n_experts, int top_k);",
+    "sources": [
+      "src/kernels/axpy_kernels.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "hidden",
+        "source": "activation:hidden",
+        "cast": "const float*"
+      },
+      {
+        "name": "indices",
+        "source": "activation:indices",
+        "cast": "const int*"
+      },
+      {
+        "name": "routing_weights",
+        "source": "activation:routing_weights",
+        "cast": "const float*"
+      },
+      {
+        "name": "expert_gate",
+        "source": "weight:moe_expert_gate",
+        "cast": "const uint16_t*"
+      },
+      {
+        "name": "expert_up",
+        "source": "weight:moe_expert_up",
+        "cast": "const uint16_t*"
+      },
+      {
+        "name": "expert_down",
+        "source": "weight:moe_expert_down",
+        "cast": "const uint16_t*"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*"
+      },
+      {
+        "name": "rows",
+        "source": "dim:_m"
+      },
+      {
+        "name": "hidden_dim",
+        "source": "dim:embed_dim"
+      },
+      {
+        "name": "intermediate_dim",
+        "source": "dim:moe_intermediate_size"
+      },
+      {
+        "name": "n_experts",
+        "source": "dim:n_routed_experts"
+      },
+      {
+        "name": "top_k",
+        "source": "dim:num_experts_per_tok"
+      }
+    ]
+  },
+  "notes": "BF16 stage storage with FP32 routing products and expert-major FP32 accumulation, rounded to BF16 at the output boundary (carried in FP32).",
+  "numerical_contract": "moe_expert_bf16_stages_fp32_weighted_expert_major_sum"
+}

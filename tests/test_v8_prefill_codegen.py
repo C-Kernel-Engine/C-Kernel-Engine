@@ -529,6 +529,62 @@ int main(void) {
                        "prefill_initial_chunk_alignment": 4, "embed_dim": 4}
             )
 
+    def test_generated_prepared_embedding_rejects_invalid_rows_before_decode(self):
+        compiler = shutil.which("cc")
+        if compiler is None:
+            self.skipTest("C compiler unavailable")
+        harness = r'''
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
+#define CK_EXPORT
+#define EMBED_DIM 4
+#define VOCAB_SIZE 2
+#define MAX_SEQ_LEN 2
+#define A_EMBEDDED_INPUT 0
+typedef struct { float *bump; float *logits; int pos; } CKModel;
+static float arena[EMBED_DIM] = {-3, -3, -3, -3};
+static float model_logits[VOCAB_SIZE] = {9, 9};
+static CKModel instance = {arena, model_logits, 0};
+static CKModel *g_model = &instance;
+static int g_ck_skip_decode_logits;
+static int cancelled;
+static int ck_model_cancel_requested(void) { return cancelled; }
+static void ck_decode_embedded(CKModel *model) {
+    model->logits[0] = model->bump[0];
+    model->logits[1] = model->bump[3];
+    model->pos++;
+}
+'''
+        driver = r'''
+int main(void) {
+    float input[4] = {1, 2, 3, 4};
+    float output[2] = {7, 8};
+    if (ck_model_decode_prepared_embedding(input, 3, output, 2) != -1) return 1;
+    if (ck_model_decode_prepared_embedding(input, 4, output, 1) != -1) return 2;
+    input[1] = NAN;
+    if (ck_model_decode_prepared_embedding(input, 4, output, 2) != -1) return 3;
+    input[1] = 2;
+    cancelled = 1;
+    if (ck_model_decode_prepared_embedding(input, 4, output, 2) != -2) return 4;
+    if (instance.pos || arena[0] != -3 || output[0] != 7 || output[1] != 8) return 5;
+    cancelled = 0;
+    if (ck_model_decode_prepared_embedding(input, 4, output, 2) != 0) return 6;
+    if (instance.pos != 1 || output[0] != 1 || output[1] != 4) return 7;
+    if (ck_model_decode_prepared_embedding(input, 4, NULL, 0) != 0) return 8;
+    input[0] = 11;
+    if (ck_model_decode_prepared_embedding(input, 4, output, 2) != -1) return 9;
+    if (instance.pos != 2 || arena[0] != 1 || output[0] != 1) return 10;
+    return 0;
+}
+'''
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "prepared_embedding.c"
+            binary = Path(folder) / "prepared_embedding"
+            source.write_text(harness + codegen_core_v8._emit_prepared_embedding_decode_api() + driver)
+            subprocess.run([compiler, "-std=c11", "-Wall", "-Werror", str(source), "-o", str(binary)], check=True)
+            subprocess.run([str(binary)], check=True)
+
     def test_generated_embedded_prefill_scales_only_declared_text_rows(self):
         compiler = shutil.which("cc")
         if compiler is None:

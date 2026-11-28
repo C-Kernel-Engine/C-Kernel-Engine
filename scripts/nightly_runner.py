@@ -786,6 +786,10 @@ TEST_SUITES = {
         "Drama 3 Generated Codebooks and Codec Transformer", "inference",
         ROOT / "tests" / "test_v8_drama3_codec_transformer.py", timeout_sec=180, pytest=True,
     ),
+    "tts_drama3_frame_feedback": TestSuite(
+        "Drama 3 Generated Acoustic Frame Feedback", "inference",
+        ROOT / "tests" / "test_v8_drama3_feedback.py", pytest=True,
+    ),
     "tts_drama3_codec_waveform": TestSuite(
         "Drama 3 Generated Reference-Code PCM", "inference",
         ROOT / "tests" / "test_v8_drama3_codec_waveform.py", timeout_sec=240, pytest=True,
