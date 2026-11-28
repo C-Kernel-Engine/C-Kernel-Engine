@@ -1320,6 +1320,19 @@ upload, not a model-selected file or permission prompt.</p>
 1,024-token Nano VL profile and a 32-token output budget. Keep exact formatting and recognized
 text as separate verdicts: a trailing newline does not change the characters read from the image,
 but fails a byte-exact answer check.</p>
+<h3>Validated OCR JSON</h3>
+<p>Supply a local Draft 2020-12 JSON schema to validate an OCR object after a normal stop.
+The launcher accepts a plain object or one complete JSON fence, rejects duplicate keys and extra
+prose, and reports accepted fields in <code>data</code>. The original <code>text</code> and its
+<code>json_source</code> remain separate. Validation errors return a nonzero exit and no
+<code>data</code>. This mode does not enable constrained decoding or change model output.</p>
+<pre><code>python scripts/pi_vision_once.py --approved-root tests/fixtures/nano_vl_ocr \
+  --image receipt.png --max-tokens 160 --json-schema tests/fixtures/nano_vl_ocr/receipt.schema.json \
+  --prompt 'Extract merchant, date, subtotal, tax, total, and items (object mapping printed item names to prices) as JSON.'</code></pre>
+<p>The server checks the rendered prompt, image rows and requested output against compiled context.
+The public cheque, receipt and checkbox fixtures have captured answers and field-level expected
+values for portable client regressions. Replaying those captures tests parsing and validation,
+not a new model run. The earlier live run got all 15 fields right, but all three answers used fences.</p>
 <p><strong>Nemotron 3 Nano Omni: not supported by this path.</strong> Its C-RADIOv4-H encoder,
 dynamic image geometry, and 2688-wide language bridge require a separate checked artifact contract.
 <a href="https://docs.nvidia.com/nemotron/nightly/nemotron/omni3/architecture.html">Publisher architecture</a>.</p>
