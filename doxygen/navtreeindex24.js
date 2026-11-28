@@ -1,5 +1,6 @@
 var NAVTREEINDEX24 =
 {
+"structCKSection.html#a6bf4783cf0480cfc58c2f5f94a493e52":[1,0,71,16],
 "structCKSection.html#a74a02e21d1d89af4a3f64c236b5595d7":[1,0,71,3],
 "structCKSection.html#a77177dc1f5d94b91942e9dd199556661":[1,0,71,14],
 "structCKSection.html#a970402cf9743b507254e92ecdb06b224":[1,0,71,1],
@@ -248,6 +249,5 @@ var NAVTREEINDEX24 =
 "structMemoryInfo.html#acc92d92ac02ffaf28749375c652956e2":[1,0,90,3],
 "structMemoryInfo.html#af06394a062088cdac896d705b504ae9b":[1,0,90,12],
 "structMemoryInfo.html#af134427563f2d7794d5cb40fe77aac7f":[1,0,90,2],
-"structMemorySlot.html":[1,0,91],
-"structMemorySlot.html#a2356cb4cf76513cf5ef48c8c2732b5aa":[1,0,91,7]
+"structMemorySlot.html":[1,0,91]
 };

@@ -1,5 +1,6 @@
 var NAVTREEINDEX17 =
 {
+"globals_defs_k.html":[2,1,6,10],
 "globals_defs_l.html":[2,1,6,11],
 "globals_defs_m.html":[2,1,6,12],
 "globals_defs_n.html":[2,1,6,13],
@@ -248,6 +249,5 @@ var NAVTREEINDEX17 =
 "kv__cache__l2__rms__append__checked_8c.html":[2,0,1,1,116],
 "kv__cache__l2__rms__append__checked_8c.html#a0c47207b347490744fa126e75306a1dd":[2,0,1,1,116,3],
 "kv__cache__l2__rms__append__checked_8c.html#a2d0b0e6568ad9aa3462c883cd1932cc2":[2,0,1,1,116,1],
-"kv__cache__l2__rms__append__checked_8c.html#a5692156214d15cb51414dd0f71c2a57e":[2,0,1,1,116,2],
-"kv__cache__l2__rms__append__checked_8c.html#a5d848125a5dd5f6f099748cb79fc5d4d":[2,0,1,1,116,0]
+"kv__cache__l2__rms__append__checked_8c.html#a5692156214d15cb51414dd0f71c2a57e":[2,0,1,1,116,2]
 };

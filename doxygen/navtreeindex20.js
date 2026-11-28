@@ -1,5 +1,6 @@
 var NAVTREEINDEX20 =
 {
+"relu__kernels__bf16_8c.html":[2,0,1,1,151],
 "relu__kernels__bf16_8c.html#a55d24741c224580192c6104c2eb4525a":[2,0,1,1,151,2],
 "relu__kernels__bf16_8c.html#a842c2002210a04d9dc4d9bdabed4fcc2":[2,0,1,1,151,1],
 "relu__kernels__bf16_8c.html#af64829ad63a9c81784d64d4f447ee39a":[2,0,1,1,151,0],
@@ -248,6 +249,5 @@ var NAVTREEINDEX20 =
 "routed__softcapped__experts__checked_8c_source.html":[2,0,1,1,162],
 "runtime__extent_8c.html":[2,0,1,1,163],
 "runtime__extent_8c.html#a2e3491878be5e3941b8adf4406550db7":[2,0,1,1,163,2],
-"runtime__extent_8c.html#a313dfde74e1135de3ab52d2f74a47a19":[2,0,1,1,163,3],
-"runtime__extent_8c.html#a826f3c5fb3ee31dbbd7bd26e2898a6dd":[2,0,1,1,163,0]
+"runtime__extent_8c.html#a313dfde74e1135de3ab52d2f74a47a19":[2,0,1,1,163,3]
 };

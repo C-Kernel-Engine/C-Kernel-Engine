@@ -1,5 +1,6 @@
 var NAVTREEINDEX21 =
 {
+"runtime__extent_8c.html#a826f3c5fb3ee31dbbd7bd26e2898a6dd":[2,0,1,1,163,0],
 "runtime__extent_8c.html#aafb5911cb55ad85cb3102bb703a77e74":[2,0,1,1,163,1],
 "runtime__extent_8c_source.html":[2,0,1,1,163],
 "rwkv7__decode_8c.html":[2,0,1,1,164],
@@ -248,6 +249,5 @@ var NAVTREEINDEX21 =
 "structCKIRV2Graph.html#adfc2e02d30a154499cfa803b1095dc6a":[1,0,43,2],
 "structCKIRV2Graph.html#ae0b967575703465657a56a64d12164ed":[1,0,43,7],
 "structCKIRV2Graph.html#aeb72a3027aef579daf9a4ac090ac71ba":[1,0,43,6],
-"structCKIRV2Node.html":[1,0,44],
-"structCKIRV2Node.html#a47c09e1e5f659536f5ae6f0abb4b061a":[1,0,44,7]
+"structCKIRV2Node.html":[1,0,44]
 };

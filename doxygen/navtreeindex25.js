@@ -1,5 +1,6 @@
 var NAVTREEINDEX25 =
 {
+"structMemorySlot.html#a2356cb4cf76513cf5ef48c8c2732b5aa":[1,0,91,7],
 "structMemorySlot.html#a2ea9f80423c6a3be54933babf9d1db0f":[1,0,91,5],
 "structMemorySlot.html#a5c71e7350e86f396ab2912410be1a162":[1,0,91,4],
 "structMemorySlot.html#a6173783f7bdc94d89af5a150e3fdc7b3":[1,0,91,1],
@@ -248,6 +249,5 @@ var NAVTREEINDEX25 =
 "structck__checked__frame__loop__control.html#a43eb73e6f213229b3ddc9d0121c6b22b":[1,0,19,0],
 "structck__checked__frame__loop__control.html#a49cf9cbb125563e6bc9ef052ff079d38":[1,0,19,2],
 "structck__checked__frame__loop__control.html#a709f96887974a273255fa49df2c34794":[1,0,19,1],
-"structck__checked__latent__loop.html":[1,0,20],
-"structck__checked__latent__loop.html#a1a43f60f57b2c6f27348b4e495421b0e":[1,0,20,2]
+"structck__checked__latent__loop.html":[1,0,20]
 };

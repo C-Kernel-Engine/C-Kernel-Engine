@@ -1267,12 +1267,16 @@ insufficient. PDF rasterization and its page/pixel limits belong to a separate f
 
 <h2>Inventory boundary</h2>
 <p><code>qwen35</code>, <code>qwen38</code>, <code>instella_moe</code>, and <code>nemotron_h</code> are text/recurrent circuits in this inventory. Their text compatibility does not certify a vision encoder. An exact vision-capable artifact and a connected CKE path must be identified before adding a numerical verdict for them.</p>
-<p><strong>Nemotron Nano 12B v2 VL BF16: projector input only.</strong>
+<p><strong>Nemotron Nano 12B v2 VL BF16: generated fixed-tile projector.</strong>
 The checked generated gather reproduces the publisher's v2 patch packing for one 512-pixel
 tile: 1024 spatial RADIO rows of width 1280 become 256 projector rows of width 5120, without
-changing BF16 storage bits. The portable test uses synthetic features, not real image captures.
-RADIO execution, the weighted projector, the 12B decoder bridge and HTTP serving are not verified.
-This does not change the capability of the text-only 9B bundle.
+changing BF16 storage bits. Generated C then runs weighted RMSNorm, bias-free expansion,
+squared ReLU, and bias-free projection with BF16 stores. On one public image, a PyTorch RADIO
+reconstruction provided the same spatial input to both projectors. With the publisher weights
+and the opt-in CBLAS provider, final embeddings differed from PyTorch by RMSE 0.000229 and maximum
+absolute error 0.03125. This is a diagnostic, not a declared numerical acceptance result.
+Native RADIO execution, the 12B decoder bridge and HTTP serving remain open. This does not
+change the capability of the text-only 9B bundle.
 <a href="https://huggingface.co/nvidia/NVIDIA-Nemotron-Nano-12B-v2-VL-BF16/blob/ca9543b126e8bf3176916d3d305ccc415f89fd4d/modeling.py">Publisher implementation</a>.</p>
 
 <h2>Next acceptance gate</h2>
