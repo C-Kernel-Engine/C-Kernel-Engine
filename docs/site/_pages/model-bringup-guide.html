@@ -1716,6 +1716,32 @@ python -m version.v8.scripts.run_sigma_text_v8 \
      the latent drift across the two BF16 model executions.</p>
   <pre><code>python -m pytest -q -rs tests/test_v8_sigma_native_session.py</code></pre>
 
+  <h3 id="drama3-codebook-5-diagnostic">Drama 3 fifth residual-code replay</h3>
+  <p>The isolated-frame test now reports a second PyTorch trajectory that
+     consumes CKE's preceding code IDs. It also replays each recorded operation
+     on the corresponding CKE operands. With the pinned BF16 weights, the fifth
+     code stays different for semantic inputs 2 and 3. Its native IDs are 672
+     and 85, and its same-history PyTorch IDs are 456 and 818.
+     All 1,024 fifth-head scores match exactly on identical hidden states.</p>
+  <p>For input 2, one shared-layer-0 mixing channel rounds to 5.09375 in CKE
+     and 5.125 in PyTorch. The FP64 dot is 5.10937449289, just below the
+     midpoint 5.109375. For input 3, the shared-layer-0 output matches and
+     the first output drift appears in shared layer 1. Its largest
+     same-input gate difference is 0.00390625, and the retained FP64
+     dot is 0.67773434194, just below the midpoint 0.677734375.
+     The fifth residual layer's output maximum error reaches 1.04297
+     and 0.33240, respectively, along the same-history trajectories.</p>
+  <p>Set <code>CK_DRAMA3_TOWER_RANGES</code> to the pinned tower shard ranges
+     and <code>CK_BLAS_LIBRARY</code> to an LP64 BLAS library exporting
+     <code>dgemm_</code>. The pinned test records all stage comparisons,
+     competing scores, and top-two margins in JUnit. It retains BF16 input
+     vectors and weight rows for the early projection differences in
+     <code>same-history-projection-operands.npz</code> under pytest's
+     temporary directory. The full-weight parity gate still fails.
+     The separate frame from text and continuation checks remain open.</p>
+  <pre><code>python -m pytest -q tests/test_v8_drama3_bf16_codebook_frame.py \
+  -o junit_family=legacy --junitxml=/tmp/drama-codebook-parity.xml</code></pre>
+
   <h2 id="xray-diagnosis">11. Diagnose divergence with X-Ray</h2>
   <p>When parity fails, do not poke at tolerances. Walk the decision tree &mdash; each branch names an owner, and the fix lands in that owner's artifact (see <a href="xray.html">the X-Ray page</a> for the full evidence model and capture-neutrality gates):</p>
   <div class="mb-table"><table><thead><tr><th>Observation</th><th>Diagnosis</th><th>Repair</th></tr></thead><tbody>

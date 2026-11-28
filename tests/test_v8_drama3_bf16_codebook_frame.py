@@ -17,7 +17,7 @@ def bits(x):
     return x.contiguous().view(torch.uint16).numpy()
 
 
-def oracle_layer(hidden, code, table, weights, key, embed_extra, heads, kv_heads, dim, trace=None):
+def oracle_layer(hidden, code, table, weights, key, embed_extra, heads, kv_heads, dim, trace=None, operands=None):
     import torch
     from torch.nn import functional as F
 
@@ -32,14 +32,15 @@ def oracle_layer(hidden, code, table, weights, key, embed_extra, heads, kv_heads
     def checkpoint(name, x):
         if trace is not None:
             trace[name] = x
-        return x
+        return operands(name) if operands is not None else x
 
-    inp = table[code].unsqueeze(0)
+    inp = checkpoint("embedding", table[code].unsqueeze(0))
     if embed_extra is not None:
-        inp = inp + embed_extra
+        inp = checkpoint("enriched", inp + embed_extra)
     e = checkpoint("enorm", norm(inp, "enorm.weight"))
     h = checkpoint("hnorm", norm(hidden, "hnorm.weight"))
-    hidden = checkpoint("mixed", projection(torch.cat((e, h), dim=-1), "eh_proj.weight"))
+    concat = checkpoint("concat", torch.cat((e, h), dim=-1))
+    hidden = checkpoint("mixed", projection(concat, "eh_proj.weight"))
     layer = "transformer_layer."
     attn = layer + "attention."
     normalized = checkpoint("attn_norm", norm(hidden, layer + "attention_norm.weight"))
@@ -60,6 +61,38 @@ def oracle_layer(hidden, code, table, weights, key, embed_extra, heads, kv_heads
     out = checkpoint("down", projection(product, mlp + "w2.weight"))
     hidden = checkpoint("pre_final_norm", hidden + out)
     return checkpoint("output", norm(hidden, "final_layernorm.weight"))
+
+
+def difference(native, oracle):
+    error = native.double() - oracle.double()
+    return {"max_abs": float(error.abs().max()), "rmse": float(error.square().mean().sqrt()),
+            "different": int((native != oracle).sum()), "elements": oracle.numel()}
+
+
+def score_comparison(native, oracle):
+    native_id, oracle_id = int(native.argmax()), int(oracle.argmax())
+    ids = sorted({native_id, oracle_id})
+    margins = {}
+    for name, scores in (("native", native), ("oracle", oracle)):
+        best = scores.float().topk(2).values.flatten()
+        margins[name] = float(best[0] - best[1])
+    return {"native_id": native_id, "oracle_id": oracle_id, "top_two_margin": margins,
+            "competing_scores": {str(i): [float(native[0, i]), float(oracle[0, i])] for i in ids}}
+
+
+
+def projection_receipt(native, oracle, source, weight, packet, key):
+    # Retain one row and its input so the largest discrepancy can be replayed
+    # on the very same BF16 operands without re-running the tower.
+    channel = int((native.float() - oracle.float()).abs().argmax())
+    result_native, result_oracle = float(native[0, channel]), float(oracle[0, channel])
+    row = weight[channel]
+    exact = float((source[0].double() * row.double()).sum())
+    packet[key + "_input"] = bits(source[0])
+    packet[key + "_weight"] = bits(row)
+    return {"channel": channel, "native": result_native, "pytorch": result_oracle,
+            "fp64_dot": exact, "midpoint": (result_native + result_oracle) * .5, "operand_key": key}
+
 
 
 def run_frame(folder, torch, weights, tables, settings):
@@ -86,7 +119,9 @@ def run_frame(folder, torch, weights, tables, settings):
     view("ranges", np.int32)[:] = [[0, 1, 1, 1]]
     code_buffer = view("code_rows", np.int32)
     codes, reference_codes, metrics, traces, first_layer = [], [], [], [], []
-    for code0 in (2, 3, 2):
+    same_history = []
+    replay_operands = {}
+    for trial, code0 in enumerate((2, 3, 2)):
         code_buffer[0] = code0
         assert run(arena, len(arena)) == 0
         code = code0
@@ -94,7 +129,9 @@ def run_frame(folder, torch, weights, tables, settings):
         expected = [code]
         stats, checkpoints = [], []
         native_h = h
-        native_code = code
+        native_code = aligned_code = code
+        aligned_h = hidden
+        aligned_layers = []
         for i in range(shared + residual):
             common = i < shared
             index = i if common else i - shared
@@ -110,6 +147,37 @@ def run_frame(folder, torch, weights, tables, settings):
             native_h = torch.from_numpy(view(f"{label}_output", np.uint16).copy()).view(torch.bfloat16)
             checkpoints.append({"layer": label, "chain_error": float((native_h.float() - h.float()).abs().max()),
                                 "local_error": float((native_h.float() - local.float()).abs().max())})
+
+            # Both paths consume CKE's preceding selections. A mismatch here
+            # cannot be caused by feeding different code IDs into the tower.
+            if trial < 2:
+                def capture(name):
+                    return torch.from_numpy(view(f"{label}_{name}", np.uint16).copy()).view(torch.bfloat16)
+
+                chain, isolated = {}, {}
+                aligned_h = oracle_layer(aligned_h, aligned_code, tables[label], weights, key, enrichment,
+                                         heads, kv_heads, dim, chain)
+                prior_hidden = hidden if i == 0 else previous_native_h
+                oracle_layer(prior_hidden, aligned_code, tables[label], weights, key, enrichment,
+                             heads, kv_heads, dim, isolated, capture)
+                stages = {name: {"same_history": difference(capture(name), candidate),
+                                 "identical_operands": difference(capture(name), isolated[name])}
+                          for name, candidate in chain.items()}
+                aligned_layer = {"layer": label, "input_code": aligned_code, "stages": stages}
+                if common and index < 2:
+                    for name, input_name, weight_suffix in (
+                        ("mixed", "concat", "eh_proj.weight"),
+                        ("gate", "ffn_norm", "transformer_layer.feed_forward.w1.weight"),
+                        ("up", "ffn_norm", "transformer_layer.feed_forward.w3.weight"),
+                    ):
+                        if stages[name]["identical_operands"]["different"]:
+                            operand_key = f"semantic{code0}_{label}_{name}"
+                            stages[name]["rounding"] = projection_receipt(
+                                capture(name), isolated[name], capture(input_name), weights[key + weight_suffix],
+                                replay_operands, operand_key,
+                            )
+                aligned_layers.append(aligned_layer)
+                previous_native_h = native_h
             if common:
                 continue
             oracle = F.linear(h, weights[f"audio_decoder_mtp.heads.{index}.weight"])[..., :limit]
@@ -118,6 +186,16 @@ def run_frame(folder, torch, weights, tables, settings):
             native_code = int(view(f"residual{index}_code", np.int32)[0])
             score = view(f"residual{index}_scores", np.uint16)
             native = (score.astype(np.uint32) << 16).view(np.float32)
+            if trial < 2:
+                head = weights[f"audio_decoder_mtp.heads.{index}.weight"][:limit]
+                native_scores = torch.from_numpy(score.copy()).view(torch.bfloat16)
+                aligned_scores = F.linear(aligned_h, head)
+                local_scores = F.linear(native_h, head)
+                aligned_layer["readout"] = {
+                    **score_comparison(native_scores, aligned_scores),
+                    "identical_operands": difference(native_scores, local_scores),
+                }
+                aligned_code = native_code
             error = native.astype(np.float64) - oracle.float().numpy()
             stats.append({"max_abs": float(np.max(np.abs(error))), "rmse": float(np.sqrt(np.mean(error ** 2))),
                           "greedy_margin": float(torch.diff(oracle.float().topk(2).values.flip(-1)).item())})
@@ -126,6 +204,8 @@ def run_frame(folder, torch, weights, tables, settings):
         reference_codes.append(expected)
         metrics.extend(stats)
         traces.append(checkpoints)
+        if trial < 2:
+            same_history.append({"semantic_id": code0, "layers": aligned_layers})
     assert codes[0] == codes[2]
     saved = view("frame_codes", np.int32).copy()
     code_buffer[0] = settings["vocabulary"]
@@ -134,8 +214,13 @@ def run_frame(folder, torch, weights, tables, settings):
     code_buffer[0] = 2
     assert run(arena, len(arena)) == 0
     np.testing.assert_array_equal(view("frame_codes", np.int32), saved)
-    return {"codes": codes[:2], "reference_codes": reference_codes[:2], "layers": traces[:2], "first_layer": first_layer[:2], "scores": metrics,
-            "max_abs": max(v["max_abs"] for v in metrics), "worst_rmse": max(v["rmse"] for v in metrics)}
+    if replay_operands:
+        np.savez(folder / "same-history-projection-operands.npz", **replay_operands)
+    return {
+        "codes": codes[:2], "reference_codes": reference_codes[:2], "layers": traces[:2],
+        "first_layer": first_layer[:2], "scores": metrics, "same_history": same_history,
+        "max_abs": max(v["max_abs"] for v in metrics), "worst_rmse": max(v["rmse"] for v in metrics),
+    }
 
 
 def test_generated_codebook_feedback(tmp_path):
@@ -152,6 +237,12 @@ def test_generated_codebook_feedback(tmp_path):
     report = run_frame(tmp_path, torch, weights, tables, settings)
     assert report["codes"] == report["reference_codes"], report
     assert report["max_abs"] <= 0.015625, report
+    for codes, aligned in zip(report["codes"], report["same_history"], strict=True):
+        inputs = [layer["input_code"] for layer in aligned["layers"]]
+        assert inputs == [codes[0]] * (settings["shared_layers"] + 1) + codes[1:-1]
+        last = aligned["layers"][-1]
+        assert last["readout"]["native_id"] == codes[-1]
+        assert last["stages"]["embedding"]["identical_operands"]["different"] == 0
 
 
 def test_pinned_codebook_frame(tmp_path, record_property):
@@ -195,5 +286,5 @@ def test_pinned_codebook_frame(tmp_path, record_property):
     weights["inv_freq"] = 10000000.0 ** (-torch.arange(0, 64, 2, dtype=torch.float32) / 64)
     report = run_frame(tmp_path, torch, weights, tables, settings)
     record_property("reports", json.dumps(report))
-    assert report["codes"] == report["reference_codes"], report
-    assert report["max_abs"] <= 0.5 and report["worst_rmse"] <= 0.05, report
+    assert report["codes"] == report["reference_codes"]
+    assert report["max_abs"] <= 0.5 and report["worst_rmse"] <= 0.05
