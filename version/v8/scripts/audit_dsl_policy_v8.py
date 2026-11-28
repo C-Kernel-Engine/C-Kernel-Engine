@@ -73,6 +73,9 @@ def _scope_nodes(function: ast.FunctionDef | ast.AsyncFunctionDef) -> list[ast.A
 
 def _reads_dispatch_key(node: ast.AST, keys: set[str]) -> bool:
     for child in ast.walk(node):
+        if isinstance(child, ast.Subscript) and isinstance(child.slice, ast.Constant):
+            if child.slice.value in keys:
+                return True
         if not isinstance(child, ast.Call) or not isinstance(child.func, ast.Attribute):
             continue
         if child.func.attr != "get" or not child.args:

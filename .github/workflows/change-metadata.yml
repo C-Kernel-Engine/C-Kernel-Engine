@@ -45,3 +45,19 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p test_openmp_policy.py
           python3 scripts/check_openmp_policy.py "$BASE_SHA" "$HEAD_SHA"
+
+  dsl-ad-hoc:
+    name: DSL ad hoc code check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Audit compiler policy and publish change counts
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 -m unittest discover -s tests -p test_bringup_footprint.py
+          python3 scripts/report_bringup_footprint.py "$BASE_SHA" "$HEAD_SHA" >> "$GITHUB_STEP_SUMMARY"
+          python3 version/v8/scripts/audit_dsl_policy_v8.py

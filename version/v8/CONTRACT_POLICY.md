@@ -44,3 +44,19 @@ The supported v8 text circuits and Qwen3-VL routes must resolve attention before
 GraphIR construction. GraphIR records the required contract and resolved
 provider. LoweredIR and call-ready IR may carry that decision but may not replace
 or reinterpret it.
+
+### DSL ad hoc code check
+
+Every PR gets an ownership-area diff in its GitHub Actions job summary. Reproduce the
+table with `python3 scripts/report_bringup_footprint.py origin/main HEAD`; add
+`--json` to see individual paths. Review changes to compiler paths, model host
+code, circuit declarations, kernels and tests alongside the generated entry and
+its parity and performance evidence. Counts measure edited lines. Renames count
+as a removal and addition. A low compiler count can still hide orchestration in
+a model-specific host script.
+
+The blocking check runs `version/v8/scripts/audit_dsl_policy_v8.py` on the
+integrated PR tree. The standard nightly exercises the same policy through
+`test-v8-dsl-policy`. Its configured compiler paths, literal limits, functions
+and exceptions are in `version/v8/dsl_policy.json`. Review changes to that scope
+when adding compiler modules or model aliases.
