@@ -127,3 +127,39 @@ int ck_scale_vector_f32(const float *input,size_t input_elements,
     for(size_t r=0;r<rows;++r) scratch[r]=input[r]*gain[0];
     return publish(output,scratch,rows);
 }
+
+int ck_prefix_softmax_rows_f32(const float *logits, size_t logits_elements,
+    const int32_t *counts, size_t count_elements, float *output, size_t output_elements,
+    size_t rows, size_t columns) {
+    size_t used;
+    if (!product(rows, columns, &used) || logits_elements < used ||
+        output_elements < used || count_elements < rows ||
+        !region(logits, logits_elements) || !region(counts, count_elements) ||
+        !region(output, output_elements) ||
+        overlap(output, output_elements, logits, logits_elements) ||
+        overlap(output, output_elements, counts, count_elements)) return -1;
+
+    for (size_t row = 0; row < rows; ++row) {
+        int32_t depth = counts[row];
+        if (depth < 1 || (size_t)depth > columns ||
+            !all_finite(logits + row * columns, (size_t)depth)) return -1;
+    }
+    for (size_t row = 0; row < rows; ++row) {
+        const float *scores = logits + row * columns;
+        float *probabilities = output + row * columns;
+        size_t depth = (size_t)counts[row];
+        float maximum = scores[0];
+        for (size_t column = 1; column < depth; ++column)
+            if (scores[column] > maximum) maximum = scores[column];
+        double denominator = 0.0;
+        for (size_t column = 0; column < depth; ++column) {
+            probabilities[column] = (float)exp((double)scores[column] - maximum);
+            denominator += probabilities[column];
+        }
+        for (size_t column = 0; column < depth; ++column)
+            probabilities[column] = (float)(probabilities[column] / denominator);
+        for (size_t column = depth; column < columns; ++column)
+            probabilities[column] = 0.0f;
+    }
+    return 0;
+}

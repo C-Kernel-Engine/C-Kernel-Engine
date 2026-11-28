@@ -2274,6 +2274,10 @@ OP_DATAFLOW = {
         "inputs": {"values": "external:values", "history": "external:history"},
         "outputs": {"output": {"slot": "adjusted_logits", "dtype": "fp32"}},
     },
+    "prefix_softmax_rows_checked": {
+        "inputs": {"logits": "external:logits", "counts": "external:counts"},
+        "outputs": {"output": {"slot": "prefix_probabilities", "dtype": "fp32"}},
+    },
     "concat_i32_checked": {
         "inputs": {"left": "external:left", "right": "external:right"},
         "outputs": {"output": {"slot": "concatenated_ids", "dtype": "i32"}},
@@ -5494,6 +5498,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "gelu_erf_backward_checked": "gelu_erf_backward_checked",
     "grouped_weighted_rows_backward_checked": "grouped_weighted_rows_backward_checked",
     "grouped_softmax_weighted_rows_checked": "grouped_softmax_weighted_rows_checked",
+    "prefix_softmax_rows_checked": "prefix_softmax_rows_checked",
     "token_span_mean_checked": "token_span_mean_checked",
     "last_valid_row_checked": "last_valid_row_checked",
     "expand_group_row_indices_checked": "expand_group_row_indices_checked",

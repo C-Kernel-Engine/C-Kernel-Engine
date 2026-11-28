@@ -1,0 +1,146 @@
+{
+  "id": "prefix_softmax_rows_checked_f32",
+  "op": "prefix_softmax_rows_checked",
+  "variant": "contiguous_fp32_stable",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "inputs": [
+    {
+      "name": "logits",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "C"
+      ]
+    },
+    {
+      "name": "counts",
+      "dtype": "i32",
+      "shape": [
+        "R"
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "C"
+      ]
+    }
+  ],
+  "dims": [
+    "R",
+    "C"
+  ],
+  "impl": {
+    "function": "ck_prefix_softmax_rows_f32",
+    "c_declaration": "int ck_prefix_softmax_rows_f32(const float *logits, size_t logits_elements, const int32_t *counts, size_t count_elements, float *output, size_t output_elements, size_t rows, size_t columns);",
+    "sources": [
+      "src/kernels/decision_tensor_ops.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "logits",
+        "source": "activation:logits",
+        "cast": "const float*",
+        "ports": [
+          "input:logits"
+        ]
+      },
+      {
+        "name": "logits_elements",
+        "source": "runtime:logits_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "counts",
+        "source": "activation:counts",
+        "cast": "const int32_t*",
+        "ports": [
+          "input:counts"
+        ]
+      },
+      {
+        "name": "count_elements",
+        "source": "runtime:count_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "output",
+        "source": "output:output",
+        "cast": "float*",
+        "ports": [
+          "output:output"
+        ]
+      },
+      {
+        "name": "output_elements",
+        "source": "runtime:output_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "rows",
+        "source": "runtime:rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "columns",
+        "source": "runtime:columns",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "notes": "Validate every active prefix before writing. Subtract the finite row maximum, store FP32 exponential terms, sum in FP64, normalize and zero the inactive suffix.",
+  "call_constant_contract": {
+    "shape_symbols": {
+      "R": "rows",
+      "C": "columns"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "logits",
+        "elements": "logits_elements",
+        "rows": "rows",
+        "width": "columns",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      },
+      {
+        "pointer": "counts",
+        "elements": "count_elements",
+        "rows": "rows",
+        "width": 1,
+        "element_bytes": 4,
+        "storage_dtype": "i32"
+      },
+      {
+        "pointer": "output",
+        "elements": "output_elements",
+        "rows": "rows",
+        "width": "columns",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_karpo_readout.py"
+    ],
+    "oracle": "Independent PyTorch softmax over each allowed prefix."
+  }
+}
