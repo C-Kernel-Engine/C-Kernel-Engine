@@ -459,13 +459,11 @@ def test_publisher_text_conditioned_tower(tmp_path, record_property):
         run, arena, view, _ = compile_checked_weight_graph(
             tmp_path, graph, stored, schema, source_config=cfg, target_isa="avx2",
         )
-        for label, table in tables.items():
-            view(f"{label}_embedding_table", np.uint16)[:] = bits(table)
+        def fill_tables(view):
+            for label, table in tables.items():
+                view(f"{label}_embedding_table", np.uint16)[:] = bits(table)
 
-        def set_bf16(name, values):
-            slot = view(name, np.uint16)
-            assert values.dtype == slot.dtype and values.shape == slot.shape
-            slot[:] = values
+        fill_tables(view)
 
         # The capture uses a text-only prompt, so each following prompt row
         # is a nonsemantic teacher label. The sentinel selects the zero row.
@@ -501,7 +499,14 @@ def test_publisher_text_conditioned_tower(tmp_path, record_property):
                     torch.from_numpy(actual).view(torch.bfloat16), torch.from_numpy(expected).view(torch.bfloat16),
                 )
 
-        def replay(step, native_feedback=None, *, native_prefill=False):
+        def replay(entry, step, native_feedback=None, *, native_prefill=False, force_codes=True):
+            run, arena, view = entry
+
+            def set_bf16(name, values):
+                slot = view(name, np.uint16)
+                assert values.dtype == slot.dtype and values.shape == slot.shape
+                slot[:] = values
+
             expected = rows[step, 1:]
             prefix = f"step{step}_"
             position = int(ref[prefix + "position"][0])
@@ -511,8 +516,9 @@ def test_publisher_text_conditioned_tower(tmp_path, record_property):
             view("code_rows", np.int32)[:] = [expected[0]]
             view("positions", np.int32)[:] = [position]
             view("ranges", np.int32)[:] = [[0, position, prompt_rows, prompt_rows + 1]]
-            for index in range(settings["residual_layers"] - 1):
-                view(f"residual{index}_forced_code", np.int32)[:] = [expected[index + 1]]
+            if force_codes:
+                for index in range(settings["residual_layers"] - 1):
+                    view(f"residual{index}_forced_code", np.int32)[:] = [expected[index + 1]]
             planes = {}
             for i, label in enumerate(tower_labels(settings)):
                 for kind, current in (("key", "k_rotary"), ("value", "v")):
@@ -534,19 +540,35 @@ def test_publisher_text_conditioned_tower(tmp_path, record_property):
                 scores.append({**difference(native, oracle), **score_comparison(native, oracle)})
             for plane, before in planes.values():
                 np.testing.assert_array_equal(plane, before)
-            result = {"frame": step, "native_prefix_tail": native_feedback is not None, "native_prefill": native_prefill,
+            result = {"frame": step, "native_prefix_tail": native_feedback is not None,
+                      "native_prefill": native_prefill, "teacher_codes": force_codes,
                       "expected_ids": expected.tolist(), "native_ids": view("frame_codes", np.int32).tolist(),
                       "scores": scores}
             return result, {(label, current): view(f"{label}_{current}", np.uint16).copy()
                             for label, current in planes}
 
-        first, native_tail = replay(0)
-        second, _ = replay(1)
-        repeated_with_tail, _ = replay(1, native_tail)
-        native_first, native_tail = replay(0, native_prefill=True)
-        native_second, _ = replay(1, native_tail, native_prefill=True)
-        results = [first, second, repeated_with_tail, native_first, native_second]
+        entry = (run, arena, view)
+        first, native_tail = replay(entry, 0)
+        second, _ = replay(entry, 1)
+        repeated_with_tail, _ = replay(entry, 1, native_tail)
+        native_first, native_tail = replay(entry, 0, native_prefill=True)
+        native_second, _ = replay(entry, 1, native_tail, native_prefill=True)
+
+        greedy_dir = tmp_path / "greedy"
+        greedy_dir.mkdir()
+        graph, cfg, schema = build_circuit(prefix_rows=prompt_rows, **settings)
+        run_greedy, arena_greedy, view_greedy, _ = compile_checked_weight_graph(
+            greedy_dir, graph, stored, schema, source_config=cfg, target_isa="avx2",
+        )
+        fill_tables(view_greedy)
+        greedy = (run_greedy, arena_greedy, view_greedy)
+        greedy_first, greedy_tail = replay(greedy, 0, native_prefill=True, force_codes=False)
+        greedy_second, _ = replay(greedy, 1, greedy_tail, native_prefill=True, force_codes=False)
+        results = [first, second, repeated_with_tail, native_first, native_second, greedy_first, greedy_second]
     record_property("text_conditioned_tower", json.dumps({"frames": results, "prefill_kv": prefill_drift}))
+    failures = []
     for result in results:
-        assert result["native_ids"] == result["expected_ids"]
-        assert all(score["max_abs"] <= .5 and score["rmse"] <= .05 for score in result["scores"])
+        if (result["native_ids"] != result["expected_ids"] or
+                any(score["max_abs"] > .5 or score["rmse"] > .05 for score in result["scores"])):
+            failures.append({key: value for key, value in result.items() if key != "scores"})
+    assert not failures, failures

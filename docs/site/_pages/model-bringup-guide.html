@@ -1771,9 +1771,17 @@ python -m pytest -q tests/test_v8_drama3_bf16_codebook_frame.py \
      buffers. The replay checks both frames with publisher K/V, then with
      generated prefill and generated K/V carried from frame one. The
      publisher's backbone hidden rows and raw code IDs remain oracle inputs
-     to the teacher-forced replay. The scores cover all 4,096 residual IDs.
-     The publisher clamps to the codec's smaller residual range only at
-     the waveform boundary.</p>
+     to the teacher-forced replay. A separate greedy replay selects all nine
+     residual IDs natively and keeps the supplied backbone row, semantic ID,
+     and enrichment. The scores cover all 4,096 residual IDs. The publisher
+     clamps to the codec's smaller residual range at the waveform boundary.</p>
+  <p>On Ryzen, the pinned <code>Hello, CKE.</code> replay with native prefill
+     and native frame-one K/V selected all residual IDs correctly in both frames.
+     Maximum score error was 0.375 and worst RMSE was 0.04406. A hybrid control
+     using publisher prefill and a native frame-one K/V row still fails the
+     exact-ID gate. Its frame-two ninth residual head selects 638 over 213
+     by 0.125, while both receive 21.0 in the publisher output. The replay
+     retains that failure and the original isolated-weight parity gate.</p>
 
   <h2 id="xray-diagnosis">11. Diagnose divergence with X-Ray</h2>
   <p>When parity fails, do not poke at tolerances. Walk the decision tree &mdash; each branch names an owner, and the fix lands in that owner's artifact (see <a href="xray.html">the X-Ray page</a> for the full evidence model and capture-neutrality gates):</p>
