@@ -9,5 +9,6 @@ var searchData=
   ['kernel_5fsize_6',['kernel_size',['../structck__audio__conv1d__job.html#a5307191c122a1a2c9c9a678c69948060',1,'ck_audio_conv1d_job']]],
   ['kernel_5fversion_7',['kernel_version',['../structSystemTopology.html#aea0398c023b6251b7e490f65c74edc73',1,'SystemTopology']]],
   ['key_8',['key',['../structCKTokenizerHashEntry.html#a577cb4e16aad79410f9255006f494aa4',1,'CKTokenizerHashEntry']]],
-  ['kv_5fcache_5fenabled_9',['kv_cache_enabled',['../structCKModel.html#a30077b979aff326f5c4bd20da8b6d807',1,'CKModel']]]
+  ['kv_5fcache_5fenabled_9',['kv_cache_enabled',['../structCKModel.html#a30077b979aff326f5c4bd20da8b6d807',1,'CKModel']]],
+  ['kv_5fwidth_10',['kv_width',['../structck__diffusion__session.html#a8ef6f9bd9f338e8e6dddca63c959b22d',1,'ck_diffusion_session']]]
 ];

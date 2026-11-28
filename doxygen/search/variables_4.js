@@ -18,7 +18,7 @@ var searchData=
   ['end_15',['end',['../utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667',1,'utf8.c']]],
   ['endpoint_16',['endpoint',['../structCKMetricsContext.html#a12dc0a7f9f6d79c77eb47bbca040f868',1,'CKMetricsContext']]],
   ['entries_17',['entries',['../structCKTokenizerHashTable.html#a94372200d57fbd18f5d6d758c7f20462',1,'CKTokenizerHashTable']]],
-  ['entry_18',['entry',['../structck__flow__model.html#a395729321df45d1e55a356744fbcbf81',1,'ck_flow_model::entry'],['../structck__flow__update.html#ac567dd3546892e650df17748e1965602',1,'ck_flow_update::entry']]],
+  ['entry_18',['entry',['../structck__diffusion__clean__entry.html#adcb7e03ac32c866ad38d84915f26238d',1,'ck_diffusion_clean_entry::entry'],['../structck__flow__model.html#a395729321df45d1e55a356744fbcbf81',1,'ck_flow_model::entry'],['../structck__flow__update.html#ac567dd3546892e650df17748e1965602',1,'ck_flow_update::entry']]],
   ['eos_19',['eos',['../tokenizer_8h.html#ae2ac59d55593a1262747f8e0c4b575d9',1,'eos:&#160;tokenizer.h'],['../true__bpe_8h.html#ae2ac59d55593a1262747f8e0c4b575d9',1,'eos:&#160;true_bpe.h']]],
   ['eos_5fid_20',['eos_id',['../structCKTokenizer.html#a70622f7babd13c77a93825497fdf2c5f',1,'CKTokenizer']]],
   ['eps_21',['eps',['../structCKLayerForwardParams.html#a63e37652b3bb5e0d394ea70af0895595',1,'CKLayerForwardParams::eps'],['../structCKLayerBackwardParams.html#ab6c8a9964ea61d631737361e490766c7',1,'CKLayerBackwardParams::eps'],['../structCKLayerForwardParamsQ4K.html#a002187e74b3fa26e39bd17a965c72f8b',1,'CKLayerForwardParamsQ4K::eps']]],

@@ -36,5 +36,6 @@ var searchData=
   ['grad_5fstart_33',['grad_start',['../structCKLayerGradOffsets.html#a6272144a177f1aa0fd8a3ff88a84c88b',1,'CKLayerGradOffsets::grad_start'],['../structCKFooterGradOffsets.html#ae9169fef93e53c932b9f4728d8cb6e30',1,'CKFooterGradOffsets::grad_start']]],
   ['grads_34',['grads',['../structCKSection.html#a35e472c769329becfef44c2bd7bcd8c8',1,'CKSection']]],
   ['grid_5fx_35',['grid_x',['../structCKSessionVisualInputV8.html#a497d2f82439ad5f675b430118c7e9bb3',1,'CKSessionVisualInputV8']]],
-  ['grid_5fy_36',['grid_y',['../structCKSessionVisualInputV8.html#a4dbe9cceed09174181b4865e1779f7fe',1,'CKSessionVisualInputV8']]]
+  ['grid_5fy_36',['grid_y',['../structCKSessionVisualInputV8.html#a4dbe9cceed09174181b4865e1779f7fe',1,'CKSessionVisualInputV8']]],
+  ['guidance_37',['guidance',['../structck__diffusion__session.html#a3e35d1c0c6705d7b9871bc9c905c2a21',1,'ck_diffusion_session::guidance'],['../structck__diffusion__block__request.html#ac5714bb55b53ded117ad43559f87c692',1,'ck_diffusion_block_request::guidance']]]
 ];

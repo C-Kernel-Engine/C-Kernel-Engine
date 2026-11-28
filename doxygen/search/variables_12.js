@@ -16,7 +16,7 @@ var searchData=
   ['token_5femb_5foffset_13',['token_emb_offset',['../structTransformerModel.html#a5e14c6be5365203ff62022d605db1672',1,'TransformerModel']]],
   ['token_5fembed_14',['token_embed',['../structCKSection.html#ada852daa4974ccedece03be2d141d1b2',1,'CKSection']]],
   ['token_5fid_15',['token_id',['../structCKTrieNode.html#aa55f70549c1823d3325218b0b71a42b8',1,'CKTrieNode']]],
-  ['token_5fids_16',['token_ids',['../structck__diffusion__step__bindings.html#a18f3b09464707e28fdefb24ed0d55ea8',1,'ck_diffusion_step_bindings']]],
+  ['token_5fids_16',['token_ids',['../structck__diffusion__step__bindings.html#a18f3b09464707e28fdefb24ed0d55ea8',1,'ck_diffusion_step_bindings::token_ids'],['../structck__diffusion__clean__entry.html#add80cdf2bd525f4ba1e85eed6e16e948',1,'ck_diffusion_clean_entry::token_ids']]],
   ['token_5flen_17',['token_len',['../structCKVocabEntry.html#a667d73bdaec1e4affe0a3f5f397aba85',1,'CKVocabEntry']]],
   ['tokens_18',['tokens',['../structCKLayerForwardParams.html#a9b2e8d95ad724035dc4ef7d8f2aeb2b8',1,'CKLayerForwardParams::tokens'],['../structCKLayerBackwardParams.html#a267b127c20c2f099f1b39e1bb618a2d1',1,'CKLayerBackwardParams::tokens'],['../structCKLayerForwardParamsQ4K.html#a70dcc9d69d068743233b527d879154b1',1,'CKLayerForwardParamsQ4K::tokens']]],
   ['tokens_5fafter_19',['tokens_after',['../structCKSessionVisualInputV8.html#afd645e197ea711e0717bae8e227419b7',1,'CKSessionVisualInputV8']]],

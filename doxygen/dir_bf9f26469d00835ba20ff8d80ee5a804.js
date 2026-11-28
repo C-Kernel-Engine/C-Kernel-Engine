@@ -1,6 +1,7 @@
 var dir_bf9f26469d00835ba20ff8d80ee5a804 =
 [
     [ "checked_diffusion_schedule.c", "checked__diffusion__schedule_8c.html", "checked__diffusion__schedule_8c" ],
+    [ "checked_diffusion_session.c", "checked__diffusion__session_8c.html", "checked__diffusion__session_8c" ],
     [ "checked_frame_codec.c", "checked__frame__codec_8c.html", "checked__frame__codec_8c" ],
     [ "checked_frame_loop.c", "checked__frame__loop_8c.html", "checked__frame__loop_8c" ],
     [ "checked_guided_flow.c", "checked__guided__flow_8c.html", "checked__guided__flow_8c" ],

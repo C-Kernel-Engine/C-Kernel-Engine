@@ -34,7 +34,7 @@ var searchData=
   ['token_5fhas_5fgpt2_5fbytes_31',['token_has_gpt2_bytes',['../ck__cli__v6_86_8c.html#af963da9602f7a5dd1aeb7cdde2c6dce9',1,'ck_cli_v6.6.c']]],
   ['token_5fhead_5flayout_5fchecked_5ff32_32',['token_head_layout_checked_f32',['../ckernel__transformer__rows__checked_8h.html#aaa5cdc6268134450359b8bf0a83eeb45',1,'token_head_layout_checked_f32(const float *input, size_t input_elements, float *output, size_t output_elements, size_t tokens, size_t heads, size_t head_dim, int head_to_token):&#160;transformer_rows_checked.c'],['../transformer__rows__checked_8c.html#aaa5cdc6268134450359b8bf0a83eeb45',1,'token_head_layout_checked_f32(const float *input, size_t input_elements, float *output, size_t output_elements, size_t tokens, size_t heads, size_t head_dim, int head_to_token):&#160;transformer_rows_checked.c']]],
   ['token_5fid_33',['token_id',['../structCKTrieNode.html#aa55f70549c1823d3325218b0b71a42b8',1,'CKTrieNode']]],
-  ['token_5fids_34',['token_ids',['../structck__diffusion__step__bindings.html#a18f3b09464707e28fdefb24ed0d55ea8',1,'ck_diffusion_step_bindings']]],
+  ['token_5fids_34',['token_ids',['../structck__diffusion__step__bindings.html#a18f3b09464707e28fdefb24ed0d55ea8',1,'ck_diffusion_step_bindings::token_ids'],['../structck__diffusion__clean__entry.html#add80cdf2bd525f4ba1e85eed6e16e948',1,'ck_diffusion_clean_entry::token_ids']]],
   ['token_5flen_35',['token_len',['../structCKVocabEntry.html#a667d73bdaec1e4affe0a3f5f397aba85',1,'CKVocabEntry']]],
   ['token_5flist_5fappend_36',['token_list_append',['../true__bpe_8c.html#a8686fc27c2c25e81c582041e5c335e0d',1,'true_bpe.c']]],
   ['token_5flist_5fclear_37',['token_list_clear',['../true__bpe_8c.html#a72a2743792c98b19ab360f088f0ab746',1,'true_bpe.c']]],

@@ -11,11 +11,12 @@ var searchData=
   ['bind_5fbf16_5fgemm_8',['bind_bf16_gemm',['../linear__rows__bf16__checked_8c.html#adfe4fbbac62977abbbeebf4476579bb1',1,'linear_rows_bf16_checked.c']]],
   ['bind_5fdgemm_9',['bind_dgemm',['../linear__rows__bf16__checked_8c.html#a647dd98e86d260a01f620d31e2b046db',1,'linear_rows_bf16_checked.c']]],
   ['bind_5fmath_10',['bind_math',['../deltanet__chunked__bf16_8c.html#a6d9bd807651e55aea4d12b7a5f01731e',1,'deltanet_chunked_bf16.c']]],
-  ['bounded_5fperiodic_5foutput_11',['bounded_periodic_output',['../audio__snake__checked_8c.html#a7504d0267dde6a683f9e246d2ee8a1d7',1,'audio_snake_checked.c']]],
-  ['buffer_5fbytes_12',['buffer_bytes',['../ckernel__codegen__v2__sections_8c.html#a26bdf2b8cd441142de5a6cdd668fc6e4',1,'ckernel_codegen_v2_sections.c']]],
-  ['buffer_5fenabled_13',['buffer_enabled',['../ckernel__mem__plan_8c.html#abb79ec65608b1997ebc6ee5983c24504',1,'ckernel_mem_plan.c']]],
-  ['buffers_14',['buffers',['../decision__tensor__ops_8c.html#a3b0f37e61a34f1e54a900bdf137a0484',1,'decision_tensor_ops.c']]],
-  ['build_5fplan_15',['build_plan',['../ckernel__mem__plan_8c.html#a2ac35f81413e92025c1492d78f45a703',1,'ckernel_mem_plan.c']]],
-  ['bump_5fbytes_16',['bump_bytes',['../ckernel__model__layout_8c.html#a1b626cc9eda38d35b5e64d1885783452',1,'ckernel_model_layout.c']]],
-  ['byte_5fto_5fgpt2_17',['byte_to_gpt2',['../true__bpe_8c.html#ae3fa01999c02fdd82a6745e66e5bc74e',1,'true_bpe.c']]]
+  ['bind_5fvisibility_11',['bind_visibility',['../checked__diffusion__session_8c.html#a1f538d2b9064fc7484dd6e05469c9945',1,'checked_diffusion_session.c']]],
+  ['bounded_5fperiodic_5foutput_12',['bounded_periodic_output',['../audio__snake__checked_8c.html#a7504d0267dde6a683f9e246d2ee8a1d7',1,'audio_snake_checked.c']]],
+  ['buffer_5fbytes_13',['buffer_bytes',['../ckernel__codegen__v2__sections_8c.html#a26bdf2b8cd441142de5a6cdd668fc6e4',1,'ckernel_codegen_v2_sections.c']]],
+  ['buffer_5fenabled_14',['buffer_enabled',['../ckernel__mem__plan_8c.html#abb79ec65608b1997ebc6ee5983c24504',1,'ckernel_mem_plan.c']]],
+  ['buffers_15',['buffers',['../decision__tensor__ops_8c.html#a3b0f37e61a34f1e54a900bdf137a0484',1,'decision_tensor_ops.c']]],
+  ['build_5fplan_16',['build_plan',['../ckernel__mem__plan_8c.html#a2ac35f81413e92025c1492d78f45a703',1,'ckernel_mem_plan.c']]],
+  ['bump_5fbytes_17',['bump_bytes',['../ckernel__model__layout_8c.html#a1b626cc9eda38d35b5e64d1885783452',1,'ckernel_model_layout.c']]],
+  ['byte_5fto_5fgpt2_18',['byte_to_gpt2',['../true__bpe_8c.html#ae3fa01999c02fdd82a6745e66e5bc74e',1,'true_bpe.c']]]
 ];
