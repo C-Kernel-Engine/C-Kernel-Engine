@@ -3,17 +3,20 @@ from version.v8.scripts.replay_bf16_projection_bundle_v8 import projection_graph
 
 
 def build_circuit(rows, *, width=2048, heads=16, kv_heads=2, dim=256, rotary=64,
-                  inner=6144, vocabulary=4096, blas=False, enrich=True, semantic_only=False):
+                  inner=6144, vocabulary=4096, blas=False, enrich=True, semantic_only=False, prefix_rows=0):
     if (any(type(n) is not int or n < 1 for n in (rows, width, heads, kv_heads, dim, rotary, inner, vocabulary))
             or heads % kv_heads or rotary > dim or rotary % 2):
         raise ValueError("invalid codebook-tower geometry")
+    if type(prefix_rows) is not int or prefix_rows < 0 or prefix_rows + rows > 0x7fffffff:
+        raise ValueError("invalid codebook-tower prefix extent")
+    memory_rows = prefix_rows + rows
     graph = projection_graph(rows, width, width)
     graph.update(name="drama3_bf16_shared_tower_layer", activation_buffers={}, activation_bindings={})
     graph["native_entry"]["function"] = "ck_drama3_bf16_shared_tower_layer"
     ops = graph["block_types"]["block"]["body"]["ops"] = []
     config = {"num_layers": 1, "embed_dim": width, "num_heads": 1, "num_kv_heads": 1,
               "head_dim": width, "intermediate_size": inner, "context_length": rows,
-              "max_seq_len": rows, "activation_buffer_dtypes": {}}
+              "max_seq_len": memory_rows, "activation_buffer_dtypes": {}}
     weights = {"inv_freq": ([rotary // 2], "F32")}
 
     def buffer(name, shape, dtype="bf16"):
@@ -21,8 +24,8 @@ def build_circuit(rows, *, width=2048, heads=16, kv_heads=2, dim=256, rotary=64,
         graph["activation_bindings"][name] = name
         config["activation_buffer_dtypes"][name] = dtype
 
-    def emit(name, op, inputs, params, channels, *, output="out", provider=None, weight_refs=None):
-        buffer(name, [rows, channels])
+    def emit(name, op, inputs, params, channels, *, output="out", provider=None, weight_refs=None, output_rows=rows):
+        buffer(name, [output_rows, channels])
         layer = {"id": name, "op": op, "kernel": provider or op, "returns_status": True,
                  "graph_slots": {"inputs": inputs, "outputs": {output: name}}, "params": params}
         if weight_refs:
@@ -92,14 +95,28 @@ def build_circuit(rows, *, width=2048, heads=16, kv_heads=2, dim=256, rotary=64,
                  "tokens": rows, "heads": count, "dim": dim, "elements": rows * count * dim,
                  "frequencies": rotary // 2,
              }}, count * dim, weight_refs={"inv_freq": "inv_freq"})
+    key, value = "k_rotary", "v"
+    if prefix_rows:
+        lengths = {"left": prefix_rows * key_width, "right": rows * key_width,
+                   "out": memory_rows * key_width}
+        for name, current in (("key", key), ("value", value)):
+            buffer(f"prefix_{name}", [prefix_rows, key_width])
+            emit(f"combined_{name}", "concat_features_bf16_checked",
+                 {"left": f"external:prefix_{name}", "right": current},
+                 {"R": 1, "A": lengths["left"], "B": lengths["right"], "C": lengths["out"],
+                  "call_constants": {"rows": 1, **{f"{side}_width": n for side, n in lengths.items()},
+                                     **{f"{side}_elements": n for side, n in lengths.items()}}},
+                 key_width, output_rows=memory_rows)
+        key, value = "combined_key", "combined_value"
+
     emit("context", "attention_ranges_checked",
-         {"query": "q_rotary", "key": "k_rotary", "value": "v", "ranges": "external:ranges"},
-         {"Q": rows, "S": rows, "H": heads, "G": kv_heads, "D": dim, "X": rows * query_width + rows,
+         {"query": "q_rotary", "key": key, "value": value, "ranges": "external:ranges"},
+         {"Q": rows, "S": memory_rows, "H": heads, "G": kv_heads, "D": dim, "X": rows * query_width + memory_rows,
           "scale": dim ** -0.5, "call_constants": {
-              "query_elements": rows * query_width, "key_elements": rows * key_width,
-              "value_elements": rows * key_width, "range_elements": rows * 4,
-              "output_elements": rows * query_width, "scratch_elements": rows * query_width + rows,
-              "query_tokens": rows, "memory_tokens": rows, "heads": heads, "kv_heads": kv_heads, "head_dim": dim,
+              "query_elements": rows * query_width, "key_elements": memory_rows * key_width,
+              "value_elements": memory_rows * key_width, "range_elements": rows * 4,
+              "output_elements": rows * query_width, "scratch_elements": rows * query_width + memory_rows,
+              "query_tokens": rows, "memory_tokens": memory_rows, "heads": heads, "kv_heads": kv_heads, "head_dim": dim,
           }}, query_width, output="output", provider="attention_ranges_checked_bf16_math")
     pointwise("gated_context", "sigmoid_mul_bf16_checked", {"gate": "attention_gate", "up": "context"}, query_width)
     project("o", "gated_context", query_width, width, attn + "wo.weight")

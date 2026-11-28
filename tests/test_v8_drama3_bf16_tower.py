@@ -12,7 +12,7 @@ from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_
 from version.v8.tts.build_drama3_bf16_tower_circuit import build_circuit
 
 
-def check_layer(output, torch, rows, geometry, table, weights, *, blas=False):
+def check_layer(output, torch, rows, geometry, table, weights, *, blas=False, check_continuation=False):
     from torch.nn import functional as F
     from torch.nn.attention import SDPBackend, sdpa_kernel
 
@@ -98,6 +98,37 @@ def check_layer(output, torch, rows, geometry, table, weights, *, blas=False):
         results[name] = {"exact": int(np.sum(actual == bits(expected))), "elements": actual.size,
                          "max_abs": float(np.max(np.abs(err))), "rmse": float(np.sqrt(np.mean(err ** 2)))}
     before = view("output", np.uint16).copy()
+    if check_continuation:
+        continuation = output / "continuation"
+        continuation.mkdir()
+        next_graph, next_config, next_schema = build_circuit(1, **geometry, prefix_rows=rows)
+        step, memory, tail, _ = compile_checked_weight_graph(
+            continuation, next_graph, storage, next_schema, source_config=next_config,
+            target_isa="portable",
+        )
+        tail("hidden", np.uint16)[:] = bits(hidden[-1:])
+        tail("unseen_sum", np.uint16)[:] = bits(unseen[-1:])
+        tail("embedding_table", np.uint16)[:] = bits(padded_table)
+        tail("code_rows", np.int32)[:] = codes[-1:].numpy()
+        tail("positions", np.int32)[:] = positions[-1:].numpy()
+        tail("ranges", np.int32)[:] = [[0, rows - 1, rows, rows + 1]]
+        prefixes = []
+        for kind, name in (("key", "k_rotary"), ("value", "v")):
+            plane = tail(f"prefix_{kind}", np.uint16)
+            plane[:-1] = view(name, np.uint16)[:-1]
+            plane[-1] = 0x4400  # large finite sentinel in the masked slot
+            prefixes.append((plane, plane.copy()))
+        assert step(memory, len(memory)) == 0
+        for name in ("output", "context", "k_rotary", "v"):
+            np.testing.assert_array_equal(tail(name, np.uint16), view(name, np.uint16)[-1:])
+        for plane, original in prefixes:
+            np.testing.assert_array_equal(plane, original)
+        tail("ranges", np.int32)[0, 3] = rows + 2
+        assert step(memory, len(memory)) != 0
+        np.testing.assert_array_equal(tail("output", np.uint16), before[-1:])
+        tail("ranges", np.int32)[0, 3] = rows + 1
+        assert step(memory, len(memory)) == 0
+        np.testing.assert_array_equal(tail("output", np.uint16), before[-1:])
     view("code_rows", np.int32)[-1] = -1
     assert run(arena, len(arena)) != 0
     np.testing.assert_array_equal(view("output", np.uint16), before)
@@ -119,7 +150,7 @@ def test_generated_first_shared_layer(tmp_path):
                for name, (shape, kind) in schema.items() if kind == "BF16"}
     weights["inv_freq"] = torch.tensor([1.0, 0.01])
     table = torch.randn((7, 13), generator=rng).bfloat16()
-    metrics = check_layer(tmp_path, torch, 3, geometry, table, weights)
+    metrics = check_layer(tmp_path, torch, 3, geometry, table, weights, check_continuation=True)
     for name, values in metrics.items():
         assert values["max_abs"] <= .016 and values["rmse"] <= .004, (name, values)
 
