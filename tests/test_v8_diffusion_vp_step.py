@@ -1,4 +1,4 @@
-"""Same-input property checks for the native FP64 DDPM update."""
+"""Same-input property checks for native FP64 VP transitions."""
 import ctypes
 import json
 from pathlib import Path
@@ -11,13 +11,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture(scope="module")
-def step(tmp_path_factory):
+def library(tmp_path_factory):
     lib = tmp_path_factory.mktemp("ddpm") / "ddpm.so"
     subprocess.run([
         "cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-ffp-contract=off",
         "-shared", "-fPIC", str(ROOT / "src/kernels/diffusion_vp_step.c"), "-lm", "-o", str(lib),
     ], check=True)
-    native = ctypes.CDLL(str(lib)).ck_diffusion_vp_ddpm_step_f64
+    return ctypes.CDLL(str(lib))
+
+
+@pytest.fixture(scope="module")
+def step(library):
+    native = library.ck_diffusion_vp_ddpm_step_f64
     native.argtypes = [ctypes.c_void_p] * 4 + [ctypes.c_size_t] + [ctypes.c_double] * 2
     native.restype = ctypes.c_int
 
@@ -55,6 +60,36 @@ def test_rejects_invalid_state_before_writing_and_recovers(step):
     assert step(z, x, noise, z, 4, -2) != 0
     np.testing.assert_array_equal(z, before)
     assert step(z, x, noise, output, 4, -2) == 0
+
+
+def test_ddim_checked_failure_preserves_output(library):
+    native = library.ck_diffusion_vp_ddim_step_schedule_f64
+    native.argtypes = [ctypes.c_void_p] * 4 + [ctypes.c_size_t] * 3
+    native.restype = ctypes.c_int
+    latent, estimate = np.array([1.2, -.7, .4]), np.array([.1, .6, -.3])
+    gamma, out = np.array([4.0, -3.0]), np.full_like(latent, -81)
+
+    def invoke(destination, temperature=300, gamma_count=2):
+        return native(latent.ctypes.data, estimate.ctypes.data, gamma.ctypes.data,
+                      destination.ctypes.data, latent.size, gamma_count, temperature)
+
+    assert invoke(out, temperature=0) == -1
+    assert invoke(out, gamma_count=1) == -1
+    gamma[:] = (-3.0, 4.0)
+    assert invoke(out) == -1
+    gamma[:] = (4.0, -3.0)
+    prior = latent.copy()
+    assert invoke(latent) == -1
+    np.testing.assert_array_equal(latent, prior)
+    estimate[-1] = np.nan
+    assert invoke(out) == -1
+    np.testing.assert_array_equal(out, -81)
+    estimate[-1] = -.3
+    assert invoke(out) == 0
+    assert np.isfinite(out).all()
+    gamma[1] = gamma[0]
+    assert invoke(out) == 0
+    np.testing.assert_array_equal(out, latent)
 
 
 def declared_ddpm(count, gamma_from, gamma_to):

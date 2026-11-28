@@ -3,9 +3,13 @@ from version.v8.scripts.build_sigma_bf16_denoiser_stack_v8 import build_circuit 
 from version.v8.scripts.checked_circuit_authoring_v8 import linear
 
 
-def build_circuit(rows, *, latent_width=16, bands=32, vocabulary=131072, prefix_rows=0, **geometry):
+def build_circuit(rows, *, latent_width=16, bands=32, vocabulary=131072, prefix_rows=0, score_temperature_milli=None, **geometry):
     if any(type(n) is not int or n < 1 for n in (latent_width, bands)):
         raise ValueError("positive latent and time-feature extents required")
+    ddim = score_temperature_milli is not None
+    if ddim and (type(score_temperature_milli) is not int or not 1 <= score_temperature_milli <= 10000):
+        raise ValueError("score temperature must be 0.001 to 10")
+    sampler = "ddim" if ddim else "ddpm"
     conditional, cond_config, schema = denoiser(rows, vocabulary=vocabulary, prefix_rows=prefix_rows, **geometry)
     unconditional, uc_config, uc_schema = denoiser(rows, vocabulary=vocabulary, **geometry)
     if schema != uc_schema:
@@ -13,8 +17,8 @@ def build_circuit(rows, *, latent_width=16, bands=32, vocabulary=131072, prefix_
 
     width = cond_config["embed_dim"]
     graph = conditional.copy()
-    graph.update(name="sigma_native_ddpm_step", activation_buffers={}, activation_bindings={})
-    graph["native_entry"]["function"] = "ck_sigma_native_ddpm_step"
+    graph.update(name=f"sigma_native_{sampler}_step", activation_buffers={}, activation_bindings={})
+    graph["native_entry"]["function"] = f"ck_sigma_native_{sampler}_step"
     config = {**cond_config, "activation_buffer_dtypes": {}}
     body = graph["block_types"]["block"]["body"]
     cond_ops = body["ops"]
@@ -58,7 +62,7 @@ def build_circuit(rows, *, latent_width=16, bands=32, vocabulary=131072, prefix_
                  ("left_elements", "right_elements", "output_elements", "elements"), hidden_count),
              provider="add_rows_checked_f32")
 
-    for name in ("step_latent", "step_noise", "step_next_latent"):
+    for name in (("step_latent", "step_next_latent") if ddim else ("step_latent", "step_noise", "step_next_latent")):
         buffer(name, [rows, latent_width], "fp64")
     buffer("step_gamma", [2], "fp64")
     buffer("step_guidance", [1])
@@ -133,10 +137,13 @@ def build_circuit(rows, *, latent_width=16, bands=32, vocabulary=131072, prefix_
     }, {"output": "step_guided"}, {"N": latent_count}, {
         "elements": latent_count, "scale_elements": 1,
     })
-    emit("ddpm", "diffusion_vp_ddpm_step_checked", {
-        "latent": "external:step_latent", "noise": "external:step_noise",
-        "gamma": "external:step_gamma", "estimate": "step_guided",
-    }, {"output": "step_next_latent"}, {"N": latent_count}, {
-        "count": latent_count, "gamma_elements": 2,
-    }, provider="diffusion_vp_ddpm_step_schedule_f64")
+    transition = {"latent": "external:step_latent", "gamma": "external:step_gamma", "estimate": "step_guided"}
+    constants = {"count": latent_count, "gamma_elements": 2}
+    if ddim:
+        constants["score_temperature_milli"] = score_temperature_milli
+    else:
+        transition["noise"] = "external:step_noise"
+    emit(sampler, f"diffusion_vp_{sampler}_step_checked", transition,
+         {"output": "step_next_latent"}, {"N": latent_count}, constants,
+         provider=f"diffusion_vp_{sampler}_step_schedule_f64")
     return graph, config, schema

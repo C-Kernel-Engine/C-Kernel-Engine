@@ -4,12 +4,13 @@ from version.v8.scripts.build_sigma_native_prefill_v8 import build_circuit as cl
 from version.v8.scripts.build_sigma_native_step_v8 import build_circuit as denoise_step
 
 
-def build_circuit(prompt_rows, block_rows, *, cache_capacity, latent_width=16, bands=32, **geometry):
+def build_circuit(prompt_rows, block_rows, *, cache_capacity, latent_width=16, bands=32, score_temperature_milli=None, **geometry):
     if (any(type(n) is not int or n <= 0 for n in (prompt_rows, block_rows, cache_capacity))
             or prompt_rows + block_rows > cache_capacity or cache_capacity + block_rows > 4096):
         raise ValueError("unsupported Sigma session capacities")
     graph, config, schema = denoise_step(block_rows, prefix_rows=cache_capacity,
-                                          latent_width=latent_width, bands=bands, **geometry)
+                                          latent_width=latent_width, bands=bands,
+                                          score_temperature_milli=score_temperature_milli, **geometry)
     graph["name"] = "sigma_native_session"
     step_entry = graph["native_entry"]["function"]
     denoise = graph["block_types"]["block"]
@@ -61,7 +62,7 @@ def build_circuit(prompt_rows, block_rows, *, cache_capacity, latent_width=16, b
     ports += ["step_" + name for name in (
         "positions", "cond_ranges", "uncond_ranges", "guidance", "latent",
         "next_latent", "noise", "gamma", "self_condition", "cond_mean", "cond_ids",
-    )]
+    ) if "step_" + name in graph["activation_buffers"]]
     for layer in range(geometry.get("layers", 26)):
         for cache, staged in (("key", "k_rotary"), ("value", "v")):
             ports.append(f"step_cond_layer{layer}_prefix_{cache}")

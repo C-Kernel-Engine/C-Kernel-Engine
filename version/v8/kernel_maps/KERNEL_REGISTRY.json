@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 604,
+      "total": 605,
       "by_op": {
         "add_backward": 1,
         "add_bf16_checked": 1,
@@ -96,6 +96,7 @@
         "diffusion_embedding_posterior_checked": 1,
         "diffusion_guidance_checked": 1,
         "diffusion_vp_condition_inputs_checked": 1,
+        "diffusion_vp_ddim_step_checked": 1,
         "diffusion_vp_ddpm_step_checked": 2,
         "embedding": 7,
         "embedding_backward": 1,
@@ -41449,6 +41450,184 @@
       "notes": "FP64 variance normalization, FP32 prior and self-conditioning arithmetic, sine then cosine time features.",
       "name": "diffusion_vp_condition_inputs_checked",
       "_source_file": "diffusion_vp_condition_inputs_checked.json"
+    },
+    {
+      "id": "diffusion_vp_ddim_step_schedule_f64",
+      "op": "diffusion_vp_ddim_step_checked",
+      "operation_interface": "diffusion.vp_ddim.runtime_schedule.score_temperature.fp64.checked.v1",
+      "variant": "checked_serial",
+      "quant": {
+        "weight": "none",
+        "activation": "fp64",
+        "output": "fp64"
+      },
+      "inputs": [
+        {
+          "name": "latent",
+          "dtype": "fp64",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "estimate",
+          "dtype": "fp64",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "gamma",
+          "dtype": "fp64",
+          "shape": [
+            2
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp64",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "N"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_diffusion_vp_ddim_step_schedule_f64",
+        "c_declaration": "int ck_diffusion_vp_ddim_step_schedule_f64(const double *latent, const double *estimate, const double *gamma, double *output, size_t count, size_t gamma_elements, size_t score_temperature_milli);",
+        "sources": [
+          "src/kernels/diffusion_vp_step.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "latent",
+            "source": "activation:latent",
+            "cast": "const double*",
+            "ports": [
+              "input:latent"
+            ]
+          },
+          {
+            "name": "estimate",
+            "source": "activation:estimate",
+            "cast": "const double*",
+            "ports": [
+              "input:estimate"
+            ]
+          },
+          {
+            "name": "gamma",
+            "source": "activation:gamma",
+            "cast": "const double*",
+            "ports": [
+              "input:gamma"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "double*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "count",
+            "source": "runtime:count",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gamma_elements",
+            "source": "runtime:gamma_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "score_temperature_milli",
+            "source": "runtime:score_temperature_milli",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "count"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "latent",
+            "elements": "count",
+            "rows": 1,
+            "width": "count",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          },
+          {
+            "pointer": "estimate",
+            "elements": "count",
+            "rows": 1,
+            "width": "count",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          },
+          {
+            "pointer": "gamma",
+            "elements": "gamma_elements",
+            "rows": 1,
+            "width": "gamma_elements",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          },
+          {
+            "pointer": "output",
+            "elements": "count",
+            "rows": 1,
+            "width": "count",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_sigma_native_session.py"
+        ]
+      },
+      "notes": "Deterministic FP64 DDIM transition with descending VP gamma and a positive score temperature expressed in thousandths.",
+      "name": "diffusion_vp_ddim_step_schedule_f64",
+      "_source_file": "diffusion_vp_ddim_step_schedule_f64.json"
     },
     {
       "id": "diffusion_vp_ddpm_step_checked_f64",

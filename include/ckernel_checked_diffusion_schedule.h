@@ -7,7 +7,7 @@
 /* Offsets refer to verified typed bindings in one generated step arena. */
 typedef struct {
     size_t latent, next_latent;             /* FP64 [latent_elements] */
-    size_t noise, gamma;                    /* FP64 [latent_elements], FP64 [2] */
+    size_t noise, gamma;                    /* FP64 [latent_elements] or SIZE_MAX, FP64 [2] */
     size_t self_condition, conditional_mean; /* FP32 [latent_elements] */
     size_t token_ids;                       /* int32 [token_count] */
 } ck_diffusion_step_bindings;
@@ -31,7 +31,8 @@ typedef struct {
 
 /* One denoising block. The caller prepares model weights, positions, visibility,
  * read-only clean prefix and guidance in the arena. Noise is explicit, with
- * one row per transition. A final evaluation at the last gamma commits IDs.
+ * one row per transition. Deterministic transitions set the noise offset to
+ * SIZE_MAX and supply no noise span. A final evaluation commits IDs.
  * Outputs remain untouched on rejection, step failure or cancellation. */
 int ck_run_checked_diffusion_schedule(const ck_diffusion_schedule_request *request);
 

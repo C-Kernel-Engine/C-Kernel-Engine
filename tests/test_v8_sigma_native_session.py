@@ -13,60 +13,14 @@ from version.v8.scripts.build_sigma_native_session_v8 import build_circuit
 from version.v8.scripts.checked_execution_exports_v8 import load_exports
 from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_graph
 
-SIZE, PTR = C.c_size_t, C.c_void_p
-ENTRY = C.CFUNCTYPE(C.c_int, PTR, SIZE)
-CANCEL = C.CFUNCTYPE(C.c_int, PTR)
-
-
-class Plane(C.Structure):
-    _fields_ = [(name, SIZE) for name in ("cache", "prefill_rows", "append_rows")]
-
-
-class Clean(C.Structure):
-    _fields_ = [("entry", PTR)] + [(name, SIZE) for name in ("token_ids", "positions", "ranges")]
-
-
-STEP_FIELDS = ("latent", "next_latent", "noise", "gamma", "self_condition", "cond_mean", "cond_ids")
-
-
-class Step(C.Structure):
-    _fields_ = [(name, SIZE) for name in STEP_FIELDS]
-
-
-class Session(C.Structure):
-    _fields_ = [
-        ("arena", PTR), ("arena_bytes", SIZE), ("prefill", Clean), ("append", Clean),
-        ("step", PTR), ("step_bindings", Step),
-        *((name, SIZE) for name in ("positions", "conditional_ranges", "unconditional_ranges", "guidance")),
-        ("planes", C.POINTER(Plane)),
-        *((name, SIZE) for name in ("plane_count", "kv_width", "capacity", "prompt_rows", "block_rows",
-                                   "latent_elements", "vocabulary", "valid_rows")),
-    ]
-
-
-class Block(C.Structure):
-    _fields_ = [
-        *((name, PTR) for name in ("latent", "schedule", "noise")),
-        *((name, SIZE) for name in ("latent_elements", "schedule_count", "noise_elements")),
-        ("guidance", C.c_float), ("staged_ids", PTR), ("output_ids", PTR),
-        ("staged_capacity", SIZE), ("output_capacity", SIZE), ("should_cancel", PTR), ("cancel_context", PTR),
-    ]
-
-
-class Seeded(C.Structure):
-    _fields_ = [
-        ("prompt_ids", PTR), ("prompt_rows", SIZE), ("schedule", PTR), ("schedule_count", SIZE),
-        ("seed", C.c_uint64), ("token_budget", SIZE), ("guidance", C.c_float),
-        ("workspace", PTR), ("workspace_elements", SIZE), ("staged_ids", PTR), ("output_ids", PTR),
-        ("staged_capacity", SIZE), ("output_capacity", SIZE), ("generated_rows", SIZE),
-        ("should_cancel", PTR), ("cancel_context", PTR),
-    ]
+from version.v8.scripts.run_sigma_text_v8 import SigmaTextSession
+from version.v8.scripts.sigma_session_v8 import Block, CANCEL, ENTRY, PTR, SIZE, Seeded, Session, bind_session
 
 
 def run_session(tmp_path, torch, geometry, weights, prompt_ids, *, blas=False):
     prompt_rows, rows = len(prompt_ids), 3
     capacity = prompt_rows + 2 * rows
-    vocabulary, kv_heads, dim = (geometry[name] for name in ("vocabulary", "kv_heads", "dim"))
+    vocabulary = geometry["vocabulary"]
     graph, config, schema = build_circuit(prompt_rows, rows, cache_capacity=capacity, **geometry, blas=blas)
     inputs = {name: bits(weights[name]) if dtype == "BF16" else weights[name].contiguous().numpy()
               for name, (_, dtype) in schema.items()}
@@ -76,35 +30,11 @@ def run_session(tmp_path, torch, geometry, weights, prompt_ids, *, blas=False):
         runtime_sources=("src/runtime/checked_diffusion_session.c", "src/runtime/checked_diffusion_schedule.c"),
         extra_exports=(*exports, "ck_generate_seeded_diffusion"),
     )
-    address = C.addressof(arena)
     checked = load_exports(tmp_path, library)
-    assert checked["properties"]["cache_capacity"] == capacity
-    assert checked["arena_bytes"] == len(arena)
-    types = {np.uint16: "bf16", np.float64: "fp64", np.float32: "fp32", np.int32: "i32"}
-
-    def offset(name, kind):
-        port = checked["ports"][name]
-        allocation = view(name, kind)
-        assert port["dtype"] == types[kind] and port["bytes"] == allocation.nbytes
-        assert port["offset"] == allocation.ctypes.data - address
-        return port["offset"]
-
-    def clean(kind):
-        entry = getattr(library, checked["entries"][kind])
-        return Clean(C.cast(entry, PTR), *(offset(kind + "_" + name, np.int32)
-                                          for name in ("prefix_tokens", "positions", "ranges")))
-
-    planes, caches = [], []
-    for i in range(geometry["layers"]):
-        for kind, produced in (("key", "k_rotary"), ("value", "v")):
-            name = f"step_cond_layer{i}_prefix_{kind}"
-            assert all(name not in writes for writes in checked["entry_writes"].values())
-            for phase in ("prefill", "append"):
-                assert f"{phase}_layer{i}_{produced}" in checked["entry_writes"][checked["entries"][phase]]
-            planes.append(Plane(offset(name, np.uint16), offset(f"prefill_layer{i}_{produced}", np.uint16),
-                                offset(f"append_layer{i}_{produced}", np.uint16)))
-            caches.append(view(name, np.uint16))
-    plane_array = (Plane * len(planes))(*planes)
+    state, _ = bind_session(tmp_path, arena, library, geometry)
+    assert state.capacity == capacity
+    caches = [view(f"step_cond_layer{i}_prefix_{kind}", np.uint16)
+              for i in range(geometry["layers"]) for kind in ("key", "value")]
     prefill, append, generate = (getattr(library, name) for name in exports)
     prefill.argtypes = append.argtypes = [C.POINTER(Session), PTR, SIZE, PTR, PTR]
     generate.argtypes = [C.POINTER(Session), C.POINTER(Block)]
@@ -128,15 +58,7 @@ def run_session(tmp_path, torch, geometry, weights, prompt_ids, *, blas=False):
             traced.append((view("step_next_latent", np.float64).copy(), view("step_cond_ids", np.int32).copy()))
         return status
 
-    kinds = (np.float64,) * 4 + (np.float32,) * 2 + (np.int32,)
-    state = Session(
-        address, len(arena), clean("prefill"), clean("append"), C.cast(traced_step, PTR),
-        Step(*(offset("step_" + name, dtype) for name, dtype in zip(STEP_FIELDS, kinds, strict=True))),
-        *(offset("step_" + name, dtype) for name, dtype in (
-            ("positions", np.int32), ("cond_ranges", np.int32), ("uncond_ranges", np.int32), ("guidance", np.float32))),
-        plane_array, len(planes), kv_heads * dim, capacity, prompt_rows, rows,
-        rows * geometry["latent_width"], vocabulary, 0,
-    )
+    state.step = C.cast(traced_step, PTR)
     s = C.byref(state)
     prompt = np.array(prompt_ids, np.int32)
     assert append(s, prompt.ctypes.data, rows, None, None) == -1
@@ -399,11 +321,7 @@ def run_session(tmp_path, torch, geometry, weights, prompt_ids, *, blas=False):
             "request_recovery": True}
 
 
-def test_native_sigma_two_blocks(tmp_path):
-    torch = pytest.importorskip("torch")
-    geometry = dict(layers=2, vocabulary=19, width=11, heads=4, kv_heads=2, dim=6, inner=17,
-                    latent_width=5, bands=4)
-    _, _, schema = build_circuit(3, 3, cache_capacity=9, **geometry)
+def synthetic_weights(torch, schema):
     rng = torch.Generator().manual_seed(573)
     weights = {}
     for name, (shape, dtype) in schema.items():
@@ -411,7 +329,17 @@ def test_native_sigma_two_blocks(tmp_path):
         weights[name] = values.bfloat16() if dtype == "BF16" else values
     weights["normalized_embedding"] = torch.nn.functional.normalize(weights["normalized_embedding"], dim=-1)
     weights["inv_freq"] = torch.tensor([1.0, 0.1, 0.001])
-    report = run_session(tmp_path, torch, geometry, weights, (1, 7, 12))
+    return weights
+
+
+SMALL = dict(layers=2, vocabulary=19, width=11, heads=4, kv_heads=2, dim=6, inner=17,
+             latent_width=5, bands=4)
+
+
+def test_native_sigma_two_blocks(tmp_path):
+    torch = pytest.importorskip("torch")
+    _, _, schema = build_circuit(3, 3, cache_capacity=9, **SMALL)
+    report = run_session(tmp_path, torch, SMALL, synthetic_weights(torch, schema), (1, 7, 12))
     for block in report["blocks"] + report["seeded_blocks"]:
         assert block["ids"] == block["oracle_ids"], report
         assert block["appended_kv_max"] <= .015625, report
@@ -438,3 +366,151 @@ def test_pinned_sigma_two_blocks(tmp_path, record_property):
         assert block["appended_kv_max"] <= .25, report
         assert max(d["latent_max"] for d in block["trajectory"]) <= .08, report
         assert all(d["conditional_ids"] == 3 for d in block["trajectory"]), report
+
+
+def compare_ddim_text(folder, session, torch, geometry, weights, text, seed, temperature):
+    rows = session.state.block_rows
+    gamma = torch.from_numpy(session.schedule)
+    native_pointer = session.state.step
+    native = ENTRY(native_pointer)
+    trajectory = []
+    layout = json.loads((folder / "layout.json").read_text())
+    guided = next(item["abs_offset"] for item in layout["memory"]["activations"]["buffers"]
+                  if item["name"] == "step_guided")
+
+    @ENTRY
+    def traced(ptr, size):
+        status = native(ptr, size)
+        if status == 0:
+            bindings = session.state.step_bindings
+            shape = (rows, geometry["latent_width"])
+            latent_t = C.c_double * (rows * geometry["latent_width"])
+            tensors = tuple(np.array(latent_t.from_address(ptr + offset)).reshape(shape)
+                            for offset in (bindings.latent, guided, bindings.next_latent))
+            ids = (C.c_int32 * rows).from_address(ptr + bindings.cond_ids)
+            trajectory.append((*tensors, np.array(ids)))
+        return status
+
+    session.state.step = C.cast(traced, PTR)
+    first = session.generate(text, seed=seed, budget=rows)
+    assert first["finish_reason"] == "budget"
+    assert len(trajectory) == len(gamma)
+    prompt_ids = first["prompt_ids"]
+    prompt_rows = len(prompt_ids)
+    positions = torch.arange(prompt_rows, dtype=torch.int32)
+    _, cache = encoder(weights["encoder.embed_tokens.weight"][prompt_ids], positions,
+                       positions[:, None] >= positions[None, :], weights, geometry)
+    block_positions = torch.arange(prompt_rows, prompt_rows + rows, dtype=torch.int32)
+    z = torch.from_numpy(gaussian_oracle(rows * geometry["latent_width"], seed, 0, dtype=np.float64))
+    z = z.reshape(rows, geometry["latent_width"])
+    metrics = []
+    self_condition = torch.zeros_like(z).float()
+    for i, (native_in, native_estimate, next_latent, ids) in enumerate(trajectory):
+        final = i == len(gamma) - 1
+        pair = gamma[i:i + 1].repeat(2) if final else gamma[i:i + 2]
+        oracle = reference(weights, geometry, z, torch.zeros_like(z), self_condition, pair, session.guidance,
+                           block_positions, torch.ones((rows, prompt_rows + rows), dtype=torch.bool), cache)
+        alpha, sigma = torch.sigmoid(-pair).sqrt(), torch.sigmoid(pair).sqrt()
+
+        def transition(latent, estimate):
+            if final:
+                return latent
+            epsilon = (latent - alpha[0] * estimate) / sigma[0].clamp(min=1e-8) / temperature
+            corrected = (latent - sigma[0] * epsilon) / alpha[0].clamp(min=1e-8)
+            return alpha[1] * corrected + sigma[1] * epsilon
+
+        same_input = transition(torch.from_numpy(native_in), torch.from_numpy(native_estimate))
+        np.testing.assert_allclose(next_latent, same_input.numpy(), atol=4e-13, rtol=2e-15)
+        z = transition(z, oracle["guided"])
+        self_condition = oracle["cond_mean"]
+        error = float(np.max(np.abs(next_latent - z.numpy())))
+        local = float(np.max(np.abs(next_latent - same_input.numpy())))
+        estimate_error = float(np.max(np.abs(native_estimate - oracle["guided"].numpy())))
+        agreeing = int(np.sum(ids == oracle["cond_ids"].numpy()))
+        metrics.append({"latent_max": error, "transition_max": local, "guided_max": estimate_error,
+                        "agreeing_ids": agreeing, "rows": rows})
+    assert ids.tolist() == first["generated_ids"]
+    session.state.step = native_pointer
+    return first, metrics
+
+
+
+def test_sigma_text_ddim_and_request_controls(tmp_path):
+    from types import SimpleNamespace
+
+    torch = pytest.importorskip("torch")
+    rows, temperature, guidance, seed = 3, 0.3, 3.0, 145
+    graph, config, schema = build_circuit(
+        rows, rows, cache_capacity=9, score_temperature_milli=300, **SMALL,
+    )
+    weights = synthetic_weights(torch, schema)
+    payloads = {name: bits(weights[name]) if dtype == "BF16" else weights[name].contiguous().numpy()
+                for name, (_, dtype) in schema.items()}
+    _, arena, _, library = compile_checked_weight_graph(
+        tmp_path, graph, payloads, schema, source_config=config, target_isa="portable",
+        runtime_sources=("src/runtime/checked_diffusion_session.c", "src/runtime/checked_diffusion_schedule.c"),
+        extra_exports=("ck_generate_seeded_diffusion",),
+    )
+
+    class TextCodec:
+        def encode(self, text):
+            return SimpleNamespace(ids=[int(word) for word in text.split()])
+
+        def decode(self, tokens, *, skip_special_tokens):
+            assert skip_special_tokens
+            return " ".join(str(token) for token in tokens)
+
+    gamma = torch.tensor([2.0, .5, -.75, -2.5], dtype=torch.float64)
+    session = SigmaTextSession(tmp_path, arena, library, SMALL, TextCodec(), gamma.numpy(), guidance)
+    assert session.state.step_bindings.noise == SIZE(-1).value
+    first, metrics = compare_ddim_text(tmp_path, session, torch, SMALL, weights, "1 7 12", seed, temperature)
+    assert all(step["latent_max"] <= .01 and step["agreeing_ids"] == rows for step in metrics), metrics
+
+    with pytest.raises(ValueError, match="capacity"):
+        session.generate("1 2 3 4", seed=seed, budget=rows)
+    with pytest.raises(ValueError, match="Budget"):
+        session.generate("1 7", seed=seed, budget=1)
+    short = session.generate("1 7", seed=seed, budget=rows)
+    assert session.state.valid_rows == 5
+    assert short["build_identity"] == first["build_identity"]
+    stopped = session.generate("1 7 12", seed=seed, budget=2 * rows, stop_strings=[first["text"]])
+    assert stopped["finish_reason"] == "stop_string"
+    assert stopped["text"] == "" and stopped["generated_ids"] == first["generated_ids"]
+    assert session.state.valid_rows == 6
+
+    calls = 0
+
+    def cancel():
+        nonlocal calls
+        calls += 1
+        return calls == 5
+
+    cancelled = session.generate("1 7", seed=seed, budget=rows, should_cancel=cancel)
+    assert cancelled["finish_reason"] == "cancelled" and cancelled["generated_ids"] == []
+    recovered = session.generate("1 7 12", seed=seed, budget=rows)
+    assert recovered["generated_ids"] == first["generated_ids"]
+
+
+def test_pinned_sigma_text_ddim(tmp_path, record_property):
+    from types import SimpleNamespace
+
+    from version.v8.scripts.run_sigma_text_v8 import GEOMETRY, build_session
+
+    checkpoint = os.environ.get("CK_SIGMA_BF16_CHECKPOINT")
+    if not checkpoint or not os.environ.get("CK_BLAS_LIBRARY"):
+        pytest.skip("configure CK_SIGMA_BF16_CHECKPOINT and CK_BLAS_LIBRARY for the pinned text harness")
+    torch = pytest.importorskip("torch")
+    safetensors = pytest.importorskip("safetensors")
+    pytest.importorskip("tokenizers")
+    args = SimpleNamespace(checkpoint=Path(checkpoint), threads=4, prompt_capacity=9, block=3, cache=12,
+                           score_temperature_milli=300, sampler="ddim", steps=3, guidance=3.0, isa="avx2")
+    session = build_session(args, tmp_path)
+    _, _, schema = build_circuit(args.prompt_capacity, args.block, cache_capacity=args.cache,
+                                  score_temperature_milli=300, **GEOMETRY, blas=True)
+    weights = pinned_weights(args.checkpoint, schema, torch, safetensors)
+    result, metrics = compare_ddim_text(tmp_path, session, torch, GEOMETRY, weights, "The capital of France is", 41, .3)
+    record_property("ddim_metrics", json.dumps({"text_result": result, "trajectory": metrics}))
+    # The DDIM score correction can amplify BF16 model drift. The local
+    # transition has its own same-input gate. Report end-to-end latent drift
+    # alongside the independent model's token-ID verdict.
+    assert all(step["agreeing_ids"] == args.block for step in metrics), metrics

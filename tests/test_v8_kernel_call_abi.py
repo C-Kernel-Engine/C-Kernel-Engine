@@ -17,7 +17,7 @@ REGISTRY = MAPS / "KERNEL_REGISTRY.json"
 EXCLUDED = {"KERNEL_REGISTRY.json", "kernel_bindings.json", "kernel_bindings.overlay.json"}
 BUILD_IR = ROOT / "version" / "v8" / "scripts" / "build_ir_v8.py"
 EXPECTED_GOVERNED_MAP_COUNT = 304
-EXPECTED_MAP_OWNED_ABI_COUNT = 477
+EXPECTED_MAP_OWNED_ABI_COUNT = 478
 GLM4_PARITY_PROVIDERS = {
     "rope_forward_qk_pairwise_llama_cpu",
     "rope_precompute_cache_llama_cpu",
@@ -234,6 +234,7 @@ class V8KernelCallABITests(unittest.TestCase):
         legacy = build_ir_v8.load_kernel_bindings()
         self.assertEqual(len(call_abis), EXPECTED_MAP_OWNED_ABI_COUNT)
         self.assertIn("relu2_bf16_checked", call_abis)
+        self.assertIn("diffusion_vp_ddim_step_schedule_f64", call_abis)
         self.assertIn("geglu_forward_quick", call_abis)
         self.assertIn("geglu_forward_quick_fp16_table", call_abis)
         self.assertIn("audio_hann_window_f32", call_abis)
