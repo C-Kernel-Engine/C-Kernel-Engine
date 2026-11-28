@@ -111,6 +111,30 @@ class RegularFP16DecodeHeadsTests(unittest.TestCase):
             q[index] = saved
             self.assertEqual(self.compare(inputs, 256, 0, 1)[0], 0)
 
+    def test_score_reuse_matches_recomputation(self):
+        flag = "CK_EXPERIMENT_REGULAR_FP16_CACHE_SCORES"
+        inputs = self.inputs()
+        for window in (0, 129):
+            for bad_head in (None, 0, 3, 5):
+                with self.subTest(window=window, bad_head=bad_head):
+                    q = inputs[0]
+                    saved = q.copy()
+                    if bad_head is not None:
+                        q[bad_head] = np.nan
+                    with patch.dict(os.environ, {flag: "0"}):
+                        expected = self.compare(inputs, 256, window, 1)
+                    with patch.dict(os.environ, {flag: "1"}):
+                        self.assertEqual(self.compare(inputs, 256, window, 1), expected)
+                    q[:] = saved
+
+        long_cache = self.inputs(1, 1, 17, 32, 16385)
+        for tokens in (16384, 16385):
+            with self.subTest(tokens=tokens):
+                with patch.dict(os.environ, {flag: "0"}):
+                    expected = self.invoke(long_cache, tokens, 0)
+                with patch.dict(os.environ, {flag: "1"}):
+                    self.assertEqual(self.invoke(long_cache, tokens, 0), expected)
+
     def test_alias_staging_limit_and_concurrent_callers(self):
         inputs = self.inputs()
         q = inputs[0]
