@@ -4126,10 +4126,15 @@ static void ck_attention_full_grid_work(int ith, int nth, void *opaque)
     }
 }
 
-static int ck_attention_parallel_enabled(int total_queries, int num_tokens, int head_dim)
+static int ck_attention_threadpool_disabled(void)
 {
     const char *disable = getenv("CK_DISABLE_ATTENTION_THREADPOOL");
-    if (disable && disable[0] && strcmp(disable, "0") != 0) return 0;
+    return disable && disable[0] && strcmp(disable, "0") != 0;
+}
+
+static int ck_attention_parallel_enabled(int total_queries, int num_tokens, int head_dim)
+{
+    if (ck_attention_threadpool_disabled()) return 0;
     /*
      * A 128-token GQA prefill can fall below the old 2048-query threshold
      * even though its causal dot products contain ample independent work.
@@ -4140,18 +4145,22 @@ static int ck_attention_parallel_enabled(int total_queries, int num_tokens, int 
     return 1;
 }
 
-static int ck_attention_pick_active_threads(const ck_threadpool_t *pool, int total_queries, int num_tokens)
+static int ck_attention_thread_cap(const ck_threadpool_t *pool)
 {
-    int nth = pool ? ck_threadpool_n_threads(pool) : 1;
+    const int nth = pool ? ck_threadpool_n_threads(pool) : 1;
     if (nth <= 1) return 1;
     const char *cap_env = getenv("CK_ATTENTION_THREAD_CAP");
-    int cap = cap_env && cap_env[0] ? atoi(cap_env) : 24;
-    if (cap < 1) cap = 1;
-    if (cap > nth) cap = nth;
+    const int cap = cap_env && cap_env[0] ? atoi(cap_env) : 24;
+    return cap < 1 ? 1 : (cap < nth ? cap : nth);
+}
+
+static int ck_attention_pick_active_threads(const ck_threadpool_t *pool, int total_queries, int num_tokens)
+{
+    const int cap = ck_attention_thread_cap(pool);
+    if (cap <= 1) return 1;
     int active = (total_queries + 127) / 128;
     if (num_tokens >= 1024 && active < 8) active = 8;
     if (active > cap) active = cap;
-    if (active > nth) active = nth;
     return active < 1 ? 1 : active;
 }
 
@@ -6961,6 +6970,110 @@ static ck_attention_status_t ck_attention_forward_decode_f16cache_gemma4(
     return CK_ATTENTION_STATUS_OK;
 }
 
+enum {
+    CK_REGULAR_DECODE_MAX_HEADS = 64,
+    CK_REGULAR_DECODE_STAGE_FLOATS = 8192,
+    CK_REGULAR_DECODE_MIN_WINDOW = 64,
+    CK_REGULAR_DECODE_MIN_HEAD_DIM = 128,
+    CK_REGULAR_DECODE_MIN_WORK = 131072,
+};
+
+typedef struct {
+    const float *q;
+    const uint16_t *k;
+    const uint16_t *v;
+    size_t kv_stride;
+    int group_size;
+    int first_token;
+    int tokens;
+    int head_dim;
+    int stride;
+} ck_regular_decode_args_t;
+
+static ck_attention_status_t ck_attention_regular_decode_head(
+    const ck_regular_decode_args_t *args, int head, float *out_head)
+{
+    const int head_dim = args->head_dim;
+    const int aligned_head_dim = args->stride;
+    const int first_token = args->first_token;
+    const int kv_tokens = args->tokens;
+    const size_t kv_offset = (size_t)(head / args->group_size) * args->kv_stride;
+    const float *q_head = args->q + (size_t)head * (size_t)aligned_head_dim;
+    const uint16_t *k_head = args->k + kv_offset;
+    const uint16_t *v_head = args->v + kv_offset;
+    uint16_t *q_half = (uint16_t *)alloca((size_t)head_dim * sizeof(uint16_t));
+    for (int d = 0; d < head_dim; ++d) q_half[d] = CK_FP32_TO_FP16(q_head[d]);
+
+    float maximum = -INFINITY;
+    for (int token = first_token; token < kv_tokens; ++token) {
+        const float score = ck_attention_dot_f16_llama(
+            q_half, k_head + (size_t) token * (size_t) aligned_head_dim, head_dim);
+        if (score > maximum) maximum = score;
+    }
+    if (!isfinite(maximum)) return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
+
+    double total = 0.0;
+    for (int token = first_token; token < kv_tokens; ++token) {
+        const float score = ck_attention_dot_f16_llama(
+            q_half, k_head + (size_t) token * (size_t) aligned_head_dim, head_dim);
+        total += (double) ck_attention_reference_expf(score - maximum);
+    }
+    if (!(total > 0.0) || !isfinite(total)) return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
+
+    for (int d = 0; d < head_dim; ++d) out_head[d] = 0.0f;
+    for (int token = first_token; token < kv_tokens; ++token) {
+        const float score = ck_attention_dot_f16_llama(
+            q_half, k_head + (size_t) token * (size_t) aligned_head_dim, head_dim);
+        const float probability = ck_attention_reference_expf(score - maximum) / (float) total;
+        const float rounded_probability = CK_FP16_TO_FP32(CK_FP32_TO_FP16(probability));
+        const uint16_t *v_row = v_head + (size_t) token * (size_t) aligned_head_dim;
+        for (int d = 0; d < head_dim; ++d) {
+            out_head[d] = fmaf(rounded_probability, CK_FP16_TO_FP32(v_row[d]), out_head[d]);
+        }
+    }
+    for (int d = head_dim; d < aligned_head_dim; ++d) out_head[d] = 0.0f;
+    return CK_ATTENTION_STATUS_OK;
+}
+
+typedef struct {
+    const ck_regular_decode_args_t *args;
+    float *staged;
+    ck_attention_status_t status[CK_REGULAR_DECODE_MAX_HEADS];
+} ck_regular_decode_work_t;
+
+static void ck_attention_regular_decode_work(int begin, int end, void *opaque)
+{
+    ck_regular_decode_work_t *work = opaque;
+    for (int head = begin; head < end; ++head) {
+        work->status[head] = ck_attention_regular_decode_head(
+            work->args, head, work->staged + (size_t)head * (size_t)work->args->stride);
+    }
+}
+
+static ck_attention_status_t ck_attention_regular_decode_parallel(
+    const ck_regular_decode_args_t *args, float *out, int heads,
+    ck_threadpool_t *pool, int active)
+{
+    float staged[CK_REGULAR_DECODE_STAGE_FLOATS];
+    ck_regular_decode_work_t work = {.args = args, .staged = staged};
+    ck_threadpool_parallel_for_n(pool, active, 0, heads, 1,
+                                 ck_attention_regular_decode_work, &work);
+    /* The serial provider publishes complete heads up to the first failure. */
+    int published = 0;
+    while (published < heads && work.status[published] == CK_ATTENTION_STATUS_OK) {
+        ++published;
+    }
+    memcpy(out, staged, (size_t)published * (size_t)args->stride * sizeof(float));
+    return published == heads ? CK_ATTENTION_STATUS_OK : work.status[published];
+}
+
+static int ck_attention_regular_decode_overlap(
+    const void *a, size_t a_bytes, const void *b, size_t b_bytes)
+{
+    const uintptr_t x = (uintptr_t)a, y = (uintptr_t)b;
+    return x <= y ? y - x < a_bytes : x - y < b_bytes;
+}
+
 ck_attention_status_t attention_forward_decode_head_major_gqa_f16cache_regular_noscale(
     const float *q_token,
     const uint16_t *k_cache,
@@ -6983,46 +7096,40 @@ ck_attention_status_t attention_forward_decode_head_major_gqa_f16cache_regular_n
         return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
     }
 
-    const size_t cache_head_stride = (size_t) cache_capacity * (size_t) aligned_head_dim;
     const int first_token = sliding_window > 0 && kv_tokens > sliding_window
         ? kv_tokens - sliding_window : 0;
-    uint16_t *q_half = (uint16_t *) alloca((size_t) head_dim * sizeof(uint16_t));
-    for (int h = 0; h < num_heads; ++h) {
-        const int kv_head = h / (num_heads / num_kv_heads);
-        const float *q_head = q_token + (size_t) h * (size_t) aligned_head_dim;
-        const uint16_t *k_head = k_cache + (size_t) kv_head * cache_head_stride;
-        const uint16_t *v_head = v_cache + (size_t) kv_head * cache_head_stride;
-        float *out_head = out_token + (size_t) h * (size_t) aligned_head_dim;
-        for (int d = 0; d < head_dim; ++d) q_half[d] = CK_FP32_TO_FP16(q_head[d]);
-
-        float maximum = -INFINITY;
-        for (int token = first_token; token < kv_tokens; ++token) {
-            const float score = ck_attention_dot_f16_llama(
-                q_half, k_head + (size_t) token * (size_t) aligned_head_dim, head_dim);
-            if (score > maximum) maximum = score;
-        }
-        if (!isfinite(maximum)) return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
-
-        double total = 0.0;
-        for (int token = first_token; token < kv_tokens; ++token) {
-            const float score = ck_attention_dot_f16_llama(
-                q_half, k_head + (size_t) token * (size_t) aligned_head_dim, head_dim);
-            total += (double) ck_attention_reference_expf(score - maximum);
-        }
-        if (!(total > 0.0) || !isfinite(total)) return CK_ATTENTION_STATUS_INVALID_ARGUMENT;
-
-        for (int d = 0; d < head_dim; ++d) out_head[d] = 0.0f;
-        for (int token = first_token; token < kv_tokens; ++token) {
-            const float score = ck_attention_dot_f16_llama(
-                q_half, k_head + (size_t) token * (size_t) aligned_head_dim, head_dim);
-            const float probability = ck_attention_reference_expf(score - maximum) / (float) total;
-            const float rounded_probability = CK_FP16_TO_FP32(CK_FP32_TO_FP16(probability));
-            const uint16_t *v_row = v_head + (size_t) token * (size_t) aligned_head_dim;
-            for (int d = 0; d < head_dim; ++d) {
-                out_head[d] = fmaf(rounded_probability, CK_FP16_TO_FP32(v_row[d]), out_head[d]);
+    const ck_regular_decode_args_t args = {
+        .q = q_token, .k = k_cache, .v = v_cache,
+        .kv_stride = (size_t)cache_capacity * (size_t)aligned_head_dim,
+        .group_size = num_heads / num_kv_heads,
+        .first_token = first_token, .tokens = kv_tokens,
+        .head_dim = head_dim, .stride = aligned_head_dim,
+    };
+    if (num_heads > 1 && num_heads <= CK_REGULAR_DECODE_MAX_HEADS &&
+        aligned_head_dim <= CK_REGULAR_DECODE_STAGE_FLOATS / num_heads &&
+        kv_tokens - first_token >= CK_REGULAR_DECODE_MIN_WINDOW &&
+        head_dim >= CK_REGULAR_DECODE_MIN_HEAD_DIM &&
+        (uint64_t)num_heads * (uint64_t)(kv_tokens - first_token) * (uint64_t)head_dim >=
+            CK_REGULAR_DECODE_MIN_WORK &&
+        args.kv_stride <= SIZE_MAX / sizeof(uint16_t) / (size_t)num_kv_heads &&
+        !ck_attention_threadpool_disabled()) {
+        const size_t out_bytes = (size_t)num_heads * (size_t)aligned_head_dim * sizeof(float);
+        const size_t cache_bytes = args.kv_stride * (size_t)num_kv_heads * sizeof(uint16_t);
+        if (!ck_attention_regular_decode_overlap(out_token, out_bytes, q_token, out_bytes) &&
+            !ck_attention_regular_decode_overlap(out_token, out_bytes, k_cache, cache_bytes) &&
+            !ck_attention_regular_decode_overlap(out_token, out_bytes, v_cache, cache_bytes)) {
+            ck_threadpool_t *pool = ck_threadpool_global();
+            int active = ck_attention_thread_cap(pool);
+            if (active > num_heads) active = num_heads;
+            if (active > 1 && !ck_threadpool_in_dispatch(pool)) {
+                return ck_attention_regular_decode_parallel(&args, out_token, num_heads, pool, active);
             }
         }
-        for (int d = head_dim; d < aligned_head_dim; ++d) out_head[d] = 0.0f;
+    }
+    for (int head = 0; head < num_heads; ++head) {
+        const ck_attention_status_t status = ck_attention_regular_decode_head(
+            &args, head, out_token + (size_t)head * (size_t)aligned_head_dim);
+        if (status != CK_ATTENTION_STATUS_OK) return status;
     }
     return CK_ATTENTION_STATUS_OK;
 }

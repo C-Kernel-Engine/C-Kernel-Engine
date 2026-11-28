@@ -728,6 +728,10 @@ TEST_SUITES = {
         "Encoder RoPE and LayerNorm independent-row dispatch", "kernels",
         ROOT / "tests" / "test_v8_encoder_row_parallel.py", timeout_sec=180,
     ),
+    "regular_fp16_decode_heads": TestSuite(
+        "Regular FP16 Decode Head Scheduling", "kernels",
+        ROOT / "tests" / "test_v8_regular_fp16_decode_heads.py", timeout_sec=120,
+    ),
     "attention_sliding": TestSuite("Attention Sliding Window", "kernels", UNITTEST_DIR / "test_attention_sliding_contract.py"),
     "attention_gemma3_arithmetic": TestSuite(
         "Gemma3 Attention Arithmetic Fixture", "kernels",
