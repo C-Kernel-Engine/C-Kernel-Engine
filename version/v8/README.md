@@ -300,26 +300,3 @@ separate prepared prefill and step arenas. Progression to subsequent
 generated blocks, RNG policy, and serving require additional runtime
 contracts. The real fixture requires about 20 GiB available memory. To retain
 the report, use `-o junit_family=xunit1 --junitxml sigma-native-step.xml`.
-
-### Sigma BF16 bounded cache continuation
-
-Run `python -m pytest -q tests/test_v8_sigma_native_session.py` with the same
-Sigma checkpoint and LP64 BLAS settings. The fixture loads one weight arena
-and binds three generated entries for clean prefill, clean append, and a
-guided DDPM step using the checked execution manifest. Allow about 22 GiB
-free memory for the pinned fixture.
-
-The native session reserves a BF16 cache of fixed capacity. The append and
-denoise entries use absolute positions and two explicit attention ranges.
-They read the valid cached rows and current rows, excluding unused cache
-capacity. The append entry stages only the newly selected clean tokens'
-keys and values. The native session publishes them with the new cache length
-and block IDs after successful evaluation. Rejection or cancellation leaves
-the committed cache and token output intact. The arena is single-owner.
-
-The fixture runs the six-token prompt through two three-token blocks with
-fixed noise and compares the appended K/V, latent trajectory and committed
-IDs against the independent PyTorch calculation. It also exercises recovery
-and repeats both blocks with direct native dispatch on the original loaded
-library. Prompt and block widths are compiled capacities. An application
-serving endpoint and native noise policy are separate milestones.
