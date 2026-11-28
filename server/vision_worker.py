@@ -7,8 +7,11 @@ import time
 
 
 def run(profile_path, payload, emit):
-    from server.vision_bundle import load, sha
+    from server.vision_bundle import RADIO_SCHEMA, load, sha
     profile = load(profile_path)
+    if profile['schema'] == RADIO_SCHEMA:
+        from server.vision_nemotron import run_nano_vl
+        return run_nano_vl(profile, payload, emit)
     scripts = Path(__file__).resolve().parents[1] / 'version/v8/scripts'
     sys.path.insert(0,str(scripts))
     import ctypes as C

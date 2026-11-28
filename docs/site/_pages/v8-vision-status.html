@@ -252,10 +252,32 @@ with publisher BF16 weights widened to FP32 and FP32 intermediate activations. T
 color fixtures had encoder feature RMSE 0.0231 and 0.0287 against the retained BF16 PyTorch
 reconstruction. The generated projector feeds the generated 12B Q4_K_M decoder with 256 image
 rows inside the publisher's image markers. It gave the expected color on both public fixtures
-and stopped normally. This does not certify BF16 encoder parity,
-dynamic tiling, OCR quality, or HTTP and harness support. It does not change the capability
-of the text-only 9B bundle.
+and stopped normally. This does not certify BF16 encoder parity, dynamic tiling, or broad
+OCR quality. It does not change the capability of the text-only 9B bundle.
 <a href="https://huggingface.co/nvidia/NVIDIA-Nemotron-Nano-12B-v2-VL-BF16/blob/ca9543b126e8bf3176916d3d305ccc415f89fd4d/modeling.py">Publisher implementation</a>.</p>
+<p><strong>Nano VL HTTP: experimental, loopback only.</strong> The separate Nano VL profile admits one uploaded
+PNG or JPEG, resizes to one 512-by-512 RGB tile, and inserts its generated prefix between the publisher's
+image delimiters. Each request owns a disposable worker and starts with fresh decoder state. The local
+client reads the image on the client machine; the server never opens a user-supplied path. Tool calls,
+incremental text streaming, dynamic tiling, PDF and other media, and third-party harness certification
+are not part of this profile.</p>
+<p>On Ryzen, the generated Nano VL bundle answered both swapped-color fixtures and read
+<code>FORM 42</code> from a synthetic image, all with normal stops. The test checked the uploaded
+image hash, distinct visual prefixes, and loaded library identities. It also rejected a path-only
+request and an oversized request, cancelled an active encoder worker and accepted the next upload.
+These are bounded application results, not independent logit parity or broad document OCR.</p>
+<p>Prepare <code>encoder/config.json</code> from the publisher, and extract <code>encoder/vision.safetensors</code>
+from the pinned BF16 checkpoint's <code>model-00001-of-00007.safetensors</code> with
+<code>python -m scripts.pack_nemotron_vision</code>. Place a BF16 CBLAS library exporting
+<code>cblas_gemm_bf16bf16f32</code> at <code>encoder/libblas.so</code>. Use the matching generated 12B staged
+decoder (as <code>decoder/libmodel.so</code>), its layouts, manifests, runtime libraries, publisher tokenizer
+and template. The matching GGUF supplies the prompt tokenizer used by this profile.</p>
+<pre><code>python -m scripts.pack_nemotron_vision model-00001-of-00007.safetensors encoder/vision.safetensors
+python -m server.vision_bundle --nemotron-vl --encoder encoder --decoder decoder \
+  --tokenizer-gguf decoder.gguf --model nemotron-nano-vl \
+  --image-placeholder '&lt;image&gt;' --output profile.json
+python -m server.vision_http --profile profile.json --threads 10
+python scripts/vision_http_client.py --model nemotron-nano-vl --image form.png --prompt 'Read the text.'</code></pre>
 <p><strong>Nemotron 3 Nano Omni: not supported by this path.</strong> Its C-RADIOv4-H encoder,
 dynamic image geometry, and 2688-wide language bridge require a separate checked artifact contract.
 <a href="https://docs.nvidia.com/nemotron/nightly/nemotron/omni3/architecture.html">Publisher architecture</a>.</p>
