@@ -108,6 +108,25 @@ class VisionHTTPTests(unittest.TestCase):
             self.assertEqual(client.post('/v1/chat/completions',json=body()).status_code,200)
             self.assertEqual(client.post('/v1/chat/completions',json=dict(body(),verify_reference=False)).status_code,400)
 
+    def test_parent_cleans_probe_and_interrupted_request_scratch(self):
+        code = '''import json,os,sys
+from pathlib import Path
+p=json.load(sys.stdin)
+root=Path(p['work_dir'])
+(root/'generated.so').write_bytes(b'diagnostic')
+Path(sys.argv[1], 'probe' if p.get('probe') else 'request').write_text(str(root))
+if p.get('probe'): print(json.dumps({'type':'complete'}),flush=True)
+else: os._exit(1)
+'''
+        with tempfile.TemporaryDirectory() as evidence, patch('server.vision_bundle.load',
+                return_value={'model':'test','image_placeholder':'<|image_pad|>'}):
+            app=create_app('unused',command=[sys.executable,'-c',code,evidence])
+            with TestClient(app) as client:
+                self.assertFalse(Path((Path(evidence)/'probe').read_text()).exists())
+                self.assertEqual(client.post('/v1/chat/completions',json=body()).status_code,500)
+                self.assertFalse(Path((Path(evidence)/'request').read_text()).exists())
+                self.assertFalse(client.get('/health').json()['busy'])
+
     def test_worker_failure_is_not_complete(self):
         async def check():
             worker=Worker('',1,1<<30,[sys.executable,'-c','print("not json")'])

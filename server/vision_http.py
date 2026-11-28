@@ -134,19 +134,22 @@ class OwnedStreamingResponse(StreamingResponse):
 
 
 def create_app(profile, *, threads=4, memory=32<<30, command=None, verify_reference=False):
-    from server.vision_bundle import load
+    from server.vision_bundle import RADIO_SCHEMA, load
     pinned=load(profile)
+    if verify_reference and pinned.get('schema') == RADIO_SCHEMA:
+        raise ValueError('reference replay is not supported by the Nemotron vision profile')
     worker=Worker(profile,threads,memory,command)
     readiness={}
     @asynccontextmanager
     async def lifespan(app):
-        async with asyncio.timeout(300):
-            async for event in worker.events({'probe':True}):
-                if event['type']=='complete':
-                    readiness.update(event)
-                    readiness['server_instance_id']=uuid.uuid4().hex
-                    readiness['reference_replay']=verify_reference
-                elif event['type']=='error': raise RuntimeError('vision preflight failed')
+        with tempfile.TemporaryDirectory(prefix='cke-vision-probe-') as scratch:
+            async with asyncio.timeout(300), aclosing(worker.events({'probe':True, 'work_dir':scratch})) as events:
+                async for event in events:
+                    if event['type']=='complete':
+                        readiness.update(event)
+                        readiness['server_instance_id']=uuid.uuid4().hex
+                        readiness['reference_replay']=verify_reference
+                    elif event['type']=='error': raise RuntimeError('vision preflight failed')
         if not readiness: raise RuntimeError('missing preflight result')
         try:
             yield
@@ -190,7 +193,8 @@ def create_app(profile, *, threads=4, memory=32<<30, command=None, verify_refere
             directory=tempfile.TemporaryDirectory(prefix='cke-vision-')
             path=Path(directory.name)/('image.png' if image.mime_type=='image/png' else 'image.jpg')
             path.write_bytes(image.data)
-            payload={'messages':messages,'image_path':str(path),'max_tokens':budget,'verify_reference':verify_reference}
+            payload={'messages':messages,'image_path':str(path),'max_tokens':budget,
+                     'verify_reference':verify_reference,'work_dir':directory.name}
             def completion(text,event):
                 return {'id':rid,'object':'chat.completion','model':pinned['model'],'created':created,
                     'choices':[{'index':0,'message':{'role':'assistant','content':text},'finish_reason':event['finish_reason']}],

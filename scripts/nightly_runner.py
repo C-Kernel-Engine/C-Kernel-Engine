@@ -2261,6 +2261,12 @@ TEST_SUITES = {
         ROOT / "tests" / "test_v8_nemotron_radio_checked.py",
         timeout_sec=120,
     ),
+    "v8_nemotron_vision_http_contract": TestSuite(
+        "Nemotron VL HTTP Profile and Image Span",
+        "inference",
+        ROOT / "server" / "tests" / "test_vision_nemotron.py",
+        timeout_sec=120,
+    ),
     "v8_hidden_export_extents": TestSuite(
         "Generated Hidden Export Extents",
         "parity",
