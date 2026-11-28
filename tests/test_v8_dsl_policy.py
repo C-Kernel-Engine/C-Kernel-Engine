@@ -147,6 +147,15 @@ def lower(config):
         findings = audit.scan_model_dispatch_source(source, ["arch"], path="lower.py")
         self.assertEqual([item["kind"] for item in findings], ["model_dispatch"])
 
+    def test_family_keyed_selection_without_if(self):
+        for selection in ("return table[key](cfg)", "return table.get(key, default)(cfg)",
+                          "match key:\n        case 'x': return 1"):
+            for field, expected in (("family", True), ("kernel_id", False)):
+                source = f"def select(cfg):\n    key = cfg['{field}']\n    {selection}"
+                with self.subTest(selection=selection, field=field):
+                    findings = audit.scan_model_dispatch_source(source, ["family"], path="x.py")
+                    self.assertEqual(bool(findings), expected)
+
     def test_ast_policy_allows_exact_operation_dispatch(self) -> None:
         source = """
 def lower(op):

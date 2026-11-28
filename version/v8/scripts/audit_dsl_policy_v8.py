@@ -129,9 +129,17 @@ def scan_model_dispatch_source(
                             changed = True
 
         for node in nodes:
-            if not isinstance(node, (ast.If, ast.IfExp, ast.While)):
+            if isinstance(node, (ast.If, ast.IfExp, ast.While)):
+                test = node.test
+            elif isinstance(node, ast.Match):
+                test = node.subject
+            elif isinstance(node, ast.Subscript):
+                test = node.slice
+            elif (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                  and node.func.attr == "get" and node.args):
+                test = node.args[0]
+            else:
                 continue
-            test = node.test
             depends = _reads_dispatch_key(test, keys) or any(
                 isinstance(child, ast.Name) and child.id in tainted for child in ast.walk(test)
             )

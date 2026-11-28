@@ -60,3 +60,12 @@ integrated PR tree. The standard nightly exercises the same policy through
 `test-v8-dsl-policy`. Its configured compiler paths, literal limits, functions
 and exceptions are in `version/v8/dsl_policy.json`. Review changes to that scope
 when adding compiler modules or model aliases.
+
+The same PR and nightly gates also compile the checked runtime-extent fixture
+under its original identity, a known model name and an unlisted family name.
+They compare call IR, memory layout and generated C, ignoring only the model
+and architecture labels in the IR config. A C-only executable links the copied
+library and checks a rejected request followed by successful expansion. An
+injected family-dependent provider swap verifies the comparison can detect a
+real change in lowering. This covers the exercised fixture; model-specific
+host scheduling and unexercised compiler paths still require bring-up evidence.
