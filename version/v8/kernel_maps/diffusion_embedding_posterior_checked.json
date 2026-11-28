@@ -1,0 +1,308 @@
+{
+  "id": "diffusion_embedding_posterior_checked",
+  "op": "diffusion_embedding_posterior_checked",
+  "operation_interface": "diffusion.embedding_posterior.checked.v1",
+  "variant": "checked_serial",
+  "quant": {
+    "weight": "fp32",
+    "activation": "bf16",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "model_scores",
+      "dtype": "bf16",
+      "shape": [
+        "R",
+        "V"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "prior_scores",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "V"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "weights": [
+    {
+      "name": "embedding",
+      "dtype": "fp32",
+      "shape": [
+        "V",
+        "D"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read",
+      "storage_class": "weight",
+      "consumption": "required"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "logits",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "V"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "mean",
+      "dtype": "fp32",
+      "shape": [
+        "R",
+        "D"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    },
+    {
+      "name": "ids",
+      "dtype": "i32",
+      "shape": [
+        "R"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "write",
+      "storage_class": "activation",
+      "consumption": "required"
+    }
+  ],
+  "dims": [
+    "R",
+    "V",
+    "D"
+  ],
+  "modes": {
+    "inference": true,
+    "training": false,
+    "backward": false
+  },
+  "impl": {
+    "function": "ck_diffusion_embedding_posterior_checked",
+    "c_declaration": "int ck_diffusion_embedding_posterior_checked(const uint16_t *model_scores, const float *prior_scores, const float *embedding, float *logits, float *mean, int32_t *ids, float *probabilities, size_t rows, size_t vocabulary, size_t width, size_t scores_elements, size_t embedding_elements, size_t mean_elements);",
+    "sources": [
+      "src/kernels/diffusion_inference_checked.c"
+    ]
+  },
+  "call_abi": {
+    "version": 1,
+    "params": [
+      {
+        "name": "model_scores",
+        "source": "activation:model_scores",
+        "cast": "const uint16_t*",
+        "ports": [
+          "input:model_scores"
+        ]
+      },
+      {
+        "name": "prior_scores",
+        "source": "activation:prior_scores",
+        "cast": "const float*",
+        "ports": [
+          "input:prior_scores"
+        ]
+      },
+      {
+        "name": "embedding",
+        "source": "weight:embedding",
+        "cast": "const float*",
+        "ports": [
+          "weight:embedding"
+        ]
+      },
+      {
+        "name": "logits",
+        "source": "output:logits",
+        "cast": "float*",
+        "ports": [
+          "output:logits"
+        ]
+      },
+      {
+        "name": "mean",
+        "source": "output:mean",
+        "cast": "float*",
+        "ports": [
+          "output:mean"
+        ]
+      },
+      {
+        "name": "ids",
+        "source": "output:ids",
+        "cast": "int32_t*",
+        "ports": [
+          "output:ids"
+        ]
+      },
+      {
+        "name": "probabilities",
+        "source": "scratch:probabilities",
+        "cast": "float*"
+      },
+      {
+        "name": "rows",
+        "source": "runtime:rows",
+        "value_type": "size_t"
+      },
+      {
+        "name": "vocabulary",
+        "source": "runtime:vocabulary",
+        "value_type": "size_t"
+      },
+      {
+        "name": "width",
+        "source": "runtime:width",
+        "value_type": "size_t"
+      },
+      {
+        "name": "scores_elements",
+        "source": "runtime:scores_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "embedding_elements",
+        "source": "runtime:embedding_elements",
+        "value_type": "size_t"
+      },
+      {
+        "name": "mean_elements",
+        "source": "runtime:mean_elements",
+        "value_type": "size_t"
+      }
+    ]
+  },
+  "call_constant_contract": {
+    "shape_symbols": {
+      "R": "rows",
+      "V": "vocabulary",
+      "D": "width"
+    },
+    "buffer_spans": [
+      {
+        "pointer": "model_scores",
+        "elements": "scores_elements",
+        "rows": 1,
+        "width": "scores_elements",
+        "element_bytes": 2,
+        "storage_dtype": "bf16",
+        "exact_elements_product": [
+          "rows",
+          "vocabulary"
+        ]
+      },
+      {
+        "pointer": "prior_scores",
+        "elements": "scores_elements",
+        "rows": 1,
+        "width": "scores_elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32",
+        "exact_elements_product": [
+          "rows",
+          "vocabulary"
+        ]
+      },
+      {
+        "pointer": "embedding",
+        "elements": "embedding_elements",
+        "rows": 1,
+        "width": "embedding_elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32",
+        "exact_elements_product": [
+          "vocabulary",
+          "width"
+        ]
+      },
+      {
+        "pointer": "logits",
+        "elements": "scores_elements",
+        "rows": 1,
+        "width": "scores_elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32",
+        "exact_elements_product": [
+          "rows",
+          "vocabulary"
+        ]
+      },
+      {
+        "pointer": "mean",
+        "elements": "mean_elements",
+        "rows": 1,
+        "width": "mean_elements",
+        "element_bytes": 4,
+        "storage_dtype": "fp32",
+        "exact_elements_product": [
+          "rows",
+          "width"
+        ]
+      },
+      {
+        "pointer": "ids",
+        "elements": "rows",
+        "rows": 1,
+        "width": "rows",
+        "element_bytes": 4,
+        "storage_dtype": "i32"
+      },
+      {
+        "pointer": "probabilities",
+        "elements": "vocabulary",
+        "rows": 1,
+        "width": "vocabulary",
+        "element_bytes": 4,
+        "storage_dtype": "fp32"
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "tests/test_v8_sigma_native_step.py"
+    ]
+  },
+  "notes": "Widen BF16 scores and add FP32 prior. First maximum ID. Max-subtracted softmax with FP32 probabilities; FP64 ordered denominator and unit-embedding mean sums.",
+  "scratch": [
+    {
+      "name": "probabilities",
+      "dtype": "fp32",
+      "shape": [
+        "V"
+      ],
+      "layout": "contiguous",
+      "placement": "local",
+      "access": "read_write",
+      "storage_class": "scratch",
+      "consumption": "required",
+      "size_bytes": "4 * V",
+      "size_resolution": "required",
+      "lifetime": "kernel_call",
+      "alignment": 64
+    }
+  ]
+}

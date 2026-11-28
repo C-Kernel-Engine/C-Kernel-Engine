@@ -5,7 +5,7 @@
     "generated_by": "ck_run_v8.py",
     "source_dir": "version/v8/kernel_maps",
     "counts": {
-      "total": 597,
+      "total": 603,
       "by_op": {
         "add_backward": 1,
         "add_bf16_checked": 1,
@@ -93,7 +93,10 @@
         "copy_last_row_checked": 1,
         "decoder_features_sequence": 1,
         "depth_residual_mix_checked": 1,
-        "diffusion_vp_ddpm_step_checked": 1,
+        "diffusion_embedding_posterior_checked": 1,
+        "diffusion_guidance_checked": 1,
+        "diffusion_vp_condition_inputs_checked": 1,
+        "diffusion_vp_ddpm_step_checked": 2,
         "embedding": 7,
         "embedding_backward": 1,
         "embedding_lookup_checked": 1,
@@ -116,7 +119,7 @@
         "fused_qkv_block": 1,
         "gated_deltanet": 8,
         "gated_shared_swiglu_expert_mlp": 4,
-        "gather_rows_bf16_checked": 1,
+        "gather_rows_bf16_checked": 2,
         "geglu": 7,
         "geglu_tanh_bf16_checked": 1,
         "gelu": 10,
@@ -184,6 +187,7 @@
         "moe_swiglu_packed_expert_mlp": 1,
         "multimodal_position_builder": 1,
         "multimodal_prefix_insert": 1,
+        "narrow_f32_bf16_checked": 1,
         "optimizer": 4,
         "partial_rope_concat": 3,
         "patch_projection": 2,
@@ -40627,6 +40631,825 @@
       "_source_file": "depth_residual_mix_checked_f32.json"
     },
     {
+      "id": "diffusion_embedding_posterior_checked",
+      "op": "diffusion_embedding_posterior_checked",
+      "operation_interface": "diffusion.embedding_posterior.checked.v1",
+      "variant": "checked_serial",
+      "quant": {
+        "weight": "fp32",
+        "activation": "bf16",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "model_scores",
+          "dtype": "bf16",
+          "shape": [
+            "R",
+            "V"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "prior_scores",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "V"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "embedding",
+          "dtype": "fp32",
+          "shape": [
+            "V",
+            "D"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "logits",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "V"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "mean",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "ids",
+          "dtype": "i32",
+          "shape": [
+            "R"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "V",
+        "D"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_diffusion_embedding_posterior_checked",
+        "c_declaration": "int ck_diffusion_embedding_posterior_checked(const uint16_t *model_scores, const float *prior_scores, const float *embedding, float *logits, float *mean, int32_t *ids, float *probabilities, size_t rows, size_t vocabulary, size_t width, size_t scores_elements, size_t embedding_elements, size_t mean_elements);",
+        "sources": [
+          "src/kernels/diffusion_inference_checked.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "model_scores",
+            "source": "activation:model_scores",
+            "cast": "const uint16_t*",
+            "ports": [
+              "input:model_scores"
+            ]
+          },
+          {
+            "name": "prior_scores",
+            "source": "activation:prior_scores",
+            "cast": "const float*",
+            "ports": [
+              "input:prior_scores"
+            ]
+          },
+          {
+            "name": "embedding",
+            "source": "weight:embedding",
+            "cast": "const float*",
+            "ports": [
+              "weight:embedding"
+            ]
+          },
+          {
+            "name": "logits",
+            "source": "output:logits",
+            "cast": "float*",
+            "ports": [
+              "output:logits"
+            ]
+          },
+          {
+            "name": "mean",
+            "source": "output:mean",
+            "cast": "float*",
+            "ports": [
+              "output:mean"
+            ]
+          },
+          {
+            "name": "ids",
+            "source": "output:ids",
+            "cast": "int32_t*",
+            "ports": [
+              "output:ids"
+            ]
+          },
+          {
+            "name": "probabilities",
+            "source": "scratch:probabilities",
+            "cast": "float*"
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "vocabulary",
+            "source": "runtime:vocabulary",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scores_elements",
+            "source": "runtime:scores_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "embedding_elements",
+            "source": "runtime:embedding_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "mean_elements",
+            "source": "runtime:mean_elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "V": "vocabulary",
+          "D": "width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "model_scores",
+            "elements": "scores_elements",
+            "rows": 1,
+            "width": "scores_elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16",
+            "exact_elements_product": [
+              "rows",
+              "vocabulary"
+            ]
+          },
+          {
+            "pointer": "prior_scores",
+            "elements": "scores_elements",
+            "rows": 1,
+            "width": "scores_elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32",
+            "exact_elements_product": [
+              "rows",
+              "vocabulary"
+            ]
+          },
+          {
+            "pointer": "embedding",
+            "elements": "embedding_elements",
+            "rows": 1,
+            "width": "embedding_elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32",
+            "exact_elements_product": [
+              "vocabulary",
+              "width"
+            ]
+          },
+          {
+            "pointer": "logits",
+            "elements": "scores_elements",
+            "rows": 1,
+            "width": "scores_elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32",
+            "exact_elements_product": [
+              "rows",
+              "vocabulary"
+            ]
+          },
+          {
+            "pointer": "mean",
+            "elements": "mean_elements",
+            "rows": 1,
+            "width": "mean_elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32",
+            "exact_elements_product": [
+              "rows",
+              "width"
+            ]
+          },
+          {
+            "pointer": "ids",
+            "elements": "rows",
+            "rows": 1,
+            "width": "rows",
+            "element_bytes": 4,
+            "storage_dtype": "i32"
+          },
+          {
+            "pointer": "probabilities",
+            "elements": "vocabulary",
+            "rows": 1,
+            "width": "vocabulary",
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_sigma_native_step.py"
+        ]
+      },
+      "notes": "Widen BF16 scores and add FP32 prior. First maximum ID. Max-subtracted softmax with FP32 probabilities; FP64 ordered denominator and unit-embedding mean sums.",
+      "scratch": [
+        {
+          "name": "probabilities",
+          "dtype": "fp32",
+          "shape": [
+            "V"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read_write",
+          "storage_class": "scratch",
+          "consumption": "required",
+          "size_bytes": "4 * V",
+          "size_resolution": "required",
+          "lifetime": "kernel_call",
+          "alignment": 64
+        }
+      ],
+      "name": "diffusion_embedding_posterior_checked",
+      "_source_file": "diffusion_embedding_posterior_checked.json"
+    },
+    {
+      "id": "diffusion_guidance_checked",
+      "op": "diffusion_guidance_checked",
+      "operation_interface": "diffusion.guidance.f32_to_f64.checked.v1",
+      "variant": "checked_serial",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp64"
+      },
+      "inputs": [
+        {
+          "name": "conditional",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "unconditional",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "scale",
+          "dtype": "fp32",
+          "shape": [
+            1
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp64",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "N"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_diffusion_guidance_checked",
+        "c_declaration": "int ck_diffusion_guidance_checked(const float *conditional, const float *unconditional, const float *scale, double *output, size_t elements, size_t scale_elements);",
+        "sources": [
+          "src/kernels/diffusion_inference_checked.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "conditional",
+            "source": "activation:conditional",
+            "cast": "const float*",
+            "ports": [
+              "input:conditional"
+            ]
+          },
+          {
+            "name": "unconditional",
+            "source": "activation:unconditional",
+            "cast": "const float*",
+            "ports": [
+              "input:unconditional"
+            ]
+          },
+          {
+            "name": "scale",
+            "source": "activation:scale",
+            "cast": "const float*",
+            "ports": [
+              "input:scale"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "double*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "scale_elements",
+            "source": "runtime:scale_elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "conditional",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          },
+          {
+            "pointer": "unconditional",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          },
+          {
+            "pointer": "scale",
+            "elements": "scale_elements",
+            "rows": 1,
+            "width": "scale_elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          },
+          {
+            "pointer": "output",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_sigma_native_step.py"
+        ]
+      },
+      "notes": "Unguided plus scale times the conditional difference in FP32, widened to FP64 for the transition.",
+      "name": "diffusion_guidance_checked",
+      "_source_file": "diffusion_guidance_checked.json"
+    },
+    {
+      "id": "diffusion_vp_condition_inputs_checked",
+      "op": "diffusion_vp_condition_inputs_checked",
+      "operation_interface": "diffusion.vp.condition_inputs.checked.v1",
+      "variant": "checked_serial",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp64",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "latent",
+          "dtype": "fp64",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "gamma",
+          "dtype": "fp64",
+          "shape": [
+            2
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "self_condition",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "frequencies",
+          "dtype": "fp32",
+          "shape": [
+            "B"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "normalized",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "prior_input",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "scaled_self",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "time_features",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "2*B"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "D",
+        "B"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_diffusion_vp_condition_inputs_checked",
+        "c_declaration": "int ck_diffusion_vp_condition_inputs_checked(const double *latent, const double *gamma, const float *self_condition, const float *frequencies, float *normalized, float *prior_input, float *scaled_self, float *time_features, size_t rows, size_t width, size_t bands, size_t elements, size_t time_elements, size_t gamma_elements);",
+        "sources": [
+          "src/kernels/diffusion_inference_checked.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "latent",
+            "source": "activation:latent",
+            "cast": "const double*",
+            "ports": [
+              "input:latent"
+            ]
+          },
+          {
+            "name": "gamma",
+            "source": "activation:gamma",
+            "cast": "const double*",
+            "ports": [
+              "input:gamma"
+            ]
+          },
+          {
+            "name": "self_condition",
+            "source": "activation:self_condition",
+            "cast": "const float*",
+            "ports": [
+              "input:self_condition"
+            ]
+          },
+          {
+            "name": "frequencies",
+            "source": "weight:frequencies",
+            "cast": "const float*",
+            "ports": [
+              "weight:frequencies"
+            ]
+          },
+          {
+            "name": "normalized",
+            "source": "output:normalized",
+            "cast": "float*",
+            "ports": [
+              "output:normalized"
+            ]
+          },
+          {
+            "name": "prior_input",
+            "source": "output:prior_input",
+            "cast": "float*",
+            "ports": [
+              "output:prior_input"
+            ]
+          },
+          {
+            "name": "scaled_self",
+            "source": "output:scaled_self",
+            "cast": "float*",
+            "ports": [
+              "output:scaled_self"
+            ]
+          },
+          {
+            "name": "time_features",
+            "source": "output:time_features",
+            "cast": "float*",
+            "ports": [
+              "output:time_features"
+            ]
+          },
+          {
+            "name": "rows",
+            "source": "runtime:rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          },
+          {
+            "name": "bands",
+            "source": "runtime:bands",
+            "value_type": "size_t"
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "time_elements",
+            "source": "runtime:time_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gamma_elements",
+            "source": "runtime:gamma_elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "rows",
+          "D": "width",
+          "B": "bands"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "latent",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 8,
+            "storage_dtype": "fp64",
+            "exact_elements_product": [
+              "rows",
+              "width"
+            ]
+          },
+          {
+            "pointer": "gamma",
+            "elements": "gamma_elements",
+            "rows": 1,
+            "width": "gamma_elements",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          },
+          {
+            "pointer": "self_condition",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32",
+            "exact_elements_product": [
+              "rows",
+              "width"
+            ]
+          },
+          {
+            "pointer": "frequencies",
+            "elements": "bands",
+            "rows": 1,
+            "width": "bands",
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          },
+          {
+            "pointer": "normalized",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32",
+            "exact_elements_product": [
+              "rows",
+              "width"
+            ]
+          },
+          {
+            "pointer": "prior_input",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32",
+            "exact_elements_product": [
+              "rows",
+              "width"
+            ]
+          },
+          {
+            "pointer": "scaled_self",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32",
+            "exact_elements_product": [
+              "rows",
+              "width"
+            ]
+          },
+          {
+            "pointer": "time_features",
+            "elements": "time_elements",
+            "rows": 1,
+            "width": "time_elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_sigma_native_step.py"
+        ]
+      },
+      "notes": "FP64 variance normalization, FP32 prior and self-conditioning arithmetic, sine then cosine time features.",
+      "name": "diffusion_vp_condition_inputs_checked",
+      "_source_file": "diffusion_vp_condition_inputs_checked.json"
+    },
+    {
       "id": "diffusion_vp_ddpm_step_checked_f64",
       "op": "diffusion_vp_ddpm_step_checked",
       "operation_interface": "diffusion.vp_ddpm.explicit_noise.fp64.checked.v1",
@@ -40803,6 +41626,207 @@
       "notes": "FP64 latent storage and explicit external noise. Monotonically nonincreasing gamma. Staged validation prevents output mutation on rejection.",
       "name": "diffusion_vp_ddpm_step_checked_f64",
       "_source_file": "diffusion_vp_ddpm_step_checked_f64.json"
+    },
+    {
+      "id": "diffusion_vp_ddpm_step_schedule_f64",
+      "op": "diffusion_vp_ddpm_step_checked",
+      "operation_interface": "diffusion.vp_ddpm.runtime_schedule.explicit_noise.fp64.checked.v1",
+      "variant": "checked_serial",
+      "quant": {
+        "weight": "none",
+        "activation": "fp64",
+        "output": "fp64"
+      },
+      "inputs": [
+        {
+          "name": "latent",
+          "dtype": "fp64",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "estimate",
+          "dtype": "fp64",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "noise",
+          "dtype": "fp64",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        },
+        {
+          "name": "gamma",
+          "dtype": "fp64",
+          "shape": [
+            2
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp64",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "N"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_diffusion_vp_ddpm_step_schedule_f64",
+        "c_declaration": "int ck_diffusion_vp_ddpm_step_schedule_f64(const double *latent, const double *estimate, const double *noise, const double *gamma, double *output, size_t count, size_t gamma_elements);",
+        "sources": [
+          "src/kernels/diffusion_vp_step.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "latent",
+            "source": "activation:latent",
+            "cast": "const double*",
+            "ports": [
+              "input:latent"
+            ]
+          },
+          {
+            "name": "estimate",
+            "source": "activation:estimate",
+            "cast": "const double*",
+            "ports": [
+              "input:estimate"
+            ]
+          },
+          {
+            "name": "noise",
+            "source": "activation:noise",
+            "cast": "const double*",
+            "ports": [
+              "input:noise"
+            ]
+          },
+          {
+            "name": "gamma",
+            "source": "activation:gamma",
+            "cast": "const double*",
+            "ports": [
+              "input:gamma"
+            ]
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "double*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "count",
+            "source": "runtime:count",
+            "value_type": "size_t"
+          },
+          {
+            "name": "gamma_elements",
+            "source": "runtime:gamma_elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "count"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "latent",
+            "elements": "count",
+            "rows": 1,
+            "width": "count",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          },
+          {
+            "pointer": "estimate",
+            "elements": "count",
+            "rows": 1,
+            "width": "count",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          },
+          {
+            "pointer": "noise",
+            "elements": "count",
+            "rows": 1,
+            "width": "count",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          },
+          {
+            "pointer": "gamma",
+            "elements": "gamma_elements",
+            "rows": 1,
+            "width": "gamma_elements",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          },
+          {
+            "pointer": "output",
+            "elements": "count",
+            "rows": 1,
+            "width": "count",
+            "element_bytes": 8,
+            "storage_dtype": "fp64"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_sigma_native_step.py"
+        ]
+      },
+      "notes": "Reuse the FP64 explicit-noise DDPM transition at caller-bound monotonically decreasing gamma endpoints.",
+      "name": "diffusion_vp_ddpm_step_schedule_f64",
+      "_source_file": "diffusion_vp_ddpm_step_schedule_f64.json"
     },
     {
       "id": "embedding_backward_f32",
@@ -47156,6 +48180,178 @@
       "notes": "Checked zero-based I32 row indices. Copies exact BF16 storage bits in index order after validating every index. Repeated indices are valid and errors leave the output unchanged.",
       "name": "gather_rows_bf16_checked",
       "_source_file": "gather_rows_bf16_checked.json"
+    },
+    {
+      "id": "gather_weight_rows_bf16_checked",
+      "op": "gather_rows_bf16_checked",
+      "operation_interface": "gather.weight_rows.bf16.checked.v1",
+      "variant": "exact_storage_copy",
+      "quant": {
+        "weight": "bf16",
+        "activation": "i32",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "indices",
+          "dtype": "i32",
+          "shape": [
+            "S"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [
+        {
+          "name": "input",
+          "dtype": "bf16",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "weight",
+          "consumption": "required"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "bf16",
+          "shape": [
+            "S",
+            "D"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "R",
+        "S",
+        "D"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_gather_rows_bf16_checked",
+        "sources": [
+          "src/kernels/gather_rows_bf16_checked.c"
+        ],
+        "c_declaration": "int ck_gather_rows_bf16_checked(const uint16_t *input, size_t input_elements, const int32_t *indices, size_t index_elements, uint16_t *output, size_t output_elements, size_t input_rows, size_t output_rows, size_t width);"
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "weight:input",
+            "cast": "const uint16_t*",
+            "ports": [
+              "weight:input"
+            ]
+          },
+          {
+            "name": "input_elements",
+            "source": "runtime:input_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "indices",
+            "source": "activation:indices",
+            "cast": "const int32_t*",
+            "ports": [
+              "input:indices"
+            ]
+          },
+          {
+            "name": "index_elements",
+            "source": "runtime:index_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output",
+            "source": "output:output",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:output"
+            ]
+          },
+          {
+            "name": "output_elements",
+            "source": "runtime:output_elements",
+            "value_type": "size_t"
+          },
+          {
+            "name": "input_rows",
+            "source": "runtime:input_rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "output_rows",
+            "source": "runtime:output_rows",
+            "value_type": "size_t"
+          },
+          {
+            "name": "width",
+            "source": "runtime:width",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "R": "input_rows",
+          "S": "output_rows",
+          "D": "width"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "input_elements",
+            "rows": "input_rows",
+            "width": "width",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          },
+          {
+            "pointer": "indices",
+            "elements": "index_elements",
+            "rows": "output_rows",
+            "width": 1,
+            "element_bytes": 4,
+            "storage_dtype": "i32"
+          },
+          {
+            "pointer": "output",
+            "elements": "output_elements",
+            "rows": "output_rows",
+            "width": "width",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_sigma_native_step.py"
+        ]
+      },
+      "notes": "Checked zero-based I32 row indices. Copies exact BF16 storage bits in index order after validating every index. Repeated indices are valid and errors leave the output unchanged.",
+      "name": "gather_weight_rows_bf16_checked",
+      "_source_file": "gather_weight_rows_bf16_checked.json"
     },
     {
       "id": "geglu_backward_exact",
@@ -86863,6 +88059,119 @@
       "notes": "Model-agnostic row-strided FP32 visual-prefix insertion. It performs no arithmetic reduction and preserves source values exactly.",
       "name": "multimodal_prefix_insert_f32",
       "_source_file": "multimodal_prefix_insert_f32.json"
+    },
+    {
+      "id": "narrow_f32_bf16_checked",
+      "op": "narrow_f32_bf16_checked",
+      "operation_interface": "tensor.narrow_fp32_bf16_rne.checked.v1",
+      "variant": "checked_serial",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "bf16"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "read",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "bf16",
+          "shape": [
+            "N"
+          ],
+          "layout": "contiguous",
+          "placement": "local",
+          "access": "write",
+          "storage_class": "activation",
+          "consumption": "required"
+        }
+      ],
+      "dims": [
+        "N"
+      ],
+      "modes": {
+        "inference": true,
+        "training": false,
+        "backward": false
+      },
+      "impl": {
+        "function": "ck_narrow_f32_bf16_checked",
+        "c_declaration": "int ck_narrow_f32_bf16_checked(const float *input, uint16_t *out, size_t elements);",
+        "sources": [
+          "src/kernels/bf16_checked_tensor_ops.c",
+          "src/kernels/gelu_kernels.c"
+        ]
+      },
+      "call_abi": {
+        "version": 1,
+        "params": [
+          {
+            "name": "input",
+            "source": "activation:input",
+            "cast": "const float*",
+            "ports": [
+              "input:input"
+            ]
+          },
+          {
+            "name": "out",
+            "source": "output:out",
+            "cast": "uint16_t*",
+            "ports": [
+              "output:out"
+            ]
+          },
+          {
+            "name": "elements",
+            "source": "runtime:elements",
+            "value_type": "size_t"
+          }
+        ]
+      },
+      "call_constant_contract": {
+        "shape_symbols": {
+          "N": "elements"
+        },
+        "buffer_spans": [
+          {
+            "pointer": "input",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 4,
+            "storage_dtype": "fp32"
+          },
+          {
+            "pointer": "out",
+            "elements": "elements",
+            "rows": 1,
+            "width": "elements",
+            "element_bytes": 2,
+            "storage_dtype": "bf16"
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_v8_sigma_native_step.py"
+        ]
+      },
+      "notes": "Convert finite input to finite BF16 with round-to-nearest-even.",
+      "name": "narrow_f32_bf16_checked",
+      "_source_file": "narrow_f32_bf16_checked.json"
     },
     {
       "id": "nemotron_group_limited_topk_router_f32",
