@@ -734,7 +734,14 @@ def _qwen35_text_refs(config: dict[str, Any], headers: dict[str, HeaderTensor]) 
     if num_layers <= 0 or embed_dim <= 0 or intermediate <= 0 or num_heads <= 0:
         raise SystemExit("Qwen3.5 config missing num_layers/embed_dim/intermediate_size/num_heads")
 
-    prefix = "model.language_model."
+    embedding_names = (
+        "model.language_model.embed_tokens.weight",
+        "language_model.embed_tokens.weight",
+    )
+    if all(name in headers for name in embedding_names):
+        raise SystemExit("Ambiguous Qwen3.5 text tensor namespace: both token embeddings are present")
+    embedding_name = _require_existing(headers, embedding_names, "token_emb")
+    prefix = embedding_name.removesuffix("embed_tokens.weight")
     layer_types = list(config.get("layer_types") or text.get("layer_types") or [])
     if layer_types and len(layer_types) != num_layers:
         raise SystemExit(f"Qwen3.5 layer_types length {len(layer_types)} != num_layers {num_layers}")
@@ -745,7 +752,7 @@ def _qwen35_text_refs(config: dict[str, Any], headers: dict[str, HeaderTensor]) 
         expert_width = int(config["moe_intermediate_size"])
 
     refs: list[TensorRef] = [
-        TensorRef("token_emb", (_require_existing(headers, (f"{prefix}embed_tokens.weight",), "token_emb"),)),
+        TensorRef("token_emb", (embedding_name,)),
     ]
 
     for layer in range(num_layers):
