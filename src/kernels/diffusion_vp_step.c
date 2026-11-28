@@ -71,3 +71,44 @@ int ck_diffusion_vp_ddpm_step_schedule_f64(const double *latent, const double *e
     if (begin < out + count * sizeof(double) && out < begin + 2 * sizeof(double)) return -1;
     return ck_diffusion_vp_ddpm_step_f64(latent, estimate, noise, output, count, gamma[0], gamma[1]);
 }
+
+static double vp_ddim_value(double z, double x, double a, double s, double next_a,
+                            double next_s, double temperature)
+{
+    double epsilon = (z - a * x) / fmax(s, 1e-8);
+    if (temperature != 1.0) {
+        epsilon /= temperature;
+        x = (z - s * epsilon) / fmax(a, 1e-8);
+    }
+    return next_a * x + next_s * epsilon;
+}
+
+/* Deterministic VP update with an explicit score temperature in thousandths. */
+int ck_diffusion_vp_ddim_step_schedule_f64(const double *latent, const double *estimate,
+                                          const double *gamma, double *output, size_t count,
+                                          size_t gamma_elements, size_t score_temperature_milli)
+{
+    if (!count || gamma_elements != 2 || !score_temperature_milli ||
+        !vp_region_valid(gamma, 2) || !vp_region_valid(latent, count) ||
+        !vp_region_valid(estimate, count) || !vp_region_valid(output, count) ||
+        !isfinite(gamma[0]) || !isfinite(gamma[1]) || gamma[0] < gamma[1])
+        return -1;
+    const size_t bytes = count * sizeof(double);
+    if (vp_overlaps(output, latent, bytes) || vp_overlaps(output, estimate, bytes) ||
+        ((uintptr_t)gamma < (uintptr_t)output + bytes &&
+         (uintptr_t)output < (uintptr_t)gamma + 2 * sizeof(double)))
+        return -1;
+
+    const double a = sqrt(vp_sigmoid(-gamma[0])), s = sqrt(vp_sigmoid(gamma[0]));
+    const double next_a = sqrt(vp_sigmoid(-gamma[1])), next_s = sqrt(vp_sigmoid(gamma[1]));
+    const double temperature = (double)score_temperature_milli / 1000.0;
+    const int final = gamma[0] == gamma[1];
+    for (size_t i = 0; i < count; ++i) {
+        if (!isfinite(latent[i]) || !isfinite(estimate[i]) ||
+            (!final && !isfinite(vp_ddim_value(latent[i], estimate[i], a, s, next_a, next_s, temperature))))
+            return -1;
+    }
+    for (size_t i = 0; i < count; ++i)
+        output[i] = final ? latent[i] : vp_ddim_value(latent[i], estimate[i], a, s, next_a, next_s, temperature);
+    return 0;
+}

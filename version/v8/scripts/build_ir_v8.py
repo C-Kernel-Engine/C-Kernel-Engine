@@ -5517,6 +5517,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "attention_ranges_checked": "attention_ranges_checked",
     "indexed_scale_checked": "indexed_scale_checked",
     "diffusion_vp_ddpm_step_checked": "diffusion_vp_ddpm_step_checked",
+    "diffusion_vp_ddim_step_checked": "diffusion_vp_ddim_step_checked",
     "diffusion_vp_condition_inputs_checked": "diffusion_vp_condition_inputs_checked",
     "diffusion_embedding_posterior_checked": "diffusion_embedding_posterior_checked",
     "diffusion_guidance_checked": "diffusion_guidance_checked",

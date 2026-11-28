@@ -49,7 +49,7 @@ typedef struct {
     uint64_t seed;
     size_t token_budget; /* positive multiple of block_rows */
     float guidance;
-    double *workspace; /* schedule_count * latent_elements, reused per block */
+    double *workspace; /* latent_elements, times schedule_count if noisy */
     size_t workspace_elements;
     int32_t *staged_ids, *output_ids;
     size_t staged_capacity, output_capacity;

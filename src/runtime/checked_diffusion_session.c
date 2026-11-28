@@ -71,11 +71,12 @@ static int valid_session(const ck_diffusion_session *s)
     const size_t offsets[] = {s->prefill.token_ids, s->prefill.positions, s->prefill.ranges,
         s->append.token_ids, s->append.positions, s->append.ranges,
         s->positions, s->conditional_ranges, s->unconditional_ranges, s->guidance,
-        d->latent, d->next_latent, d->noise, d->gamma, d->self_condition, d->conditional_mean, d->token_ids};
-    const size_t counts[] = {p,p,4*p,b,b,4*b,b,4*b,4*b,1,n,n,n,2,n,n,b};
-    const size_t widths[] = {4,4,4,4,4,4,4,4,4,4,8,8,8,8,4,4,4};
+        d->latent, d->next_latent, d->gamma, d->self_condition, d->conditional_mean, d->token_ids, d->noise};
+    const size_t counts[] = {p,p,4*p,b,b,4*b,b,4*b,4*b,1,n,n,2,n,n,b,n};
+    const size_t widths[] = {4,4,4,4,4,4,4,4,4,4,8,8,8,4,4,4,8};
     span fixed[sizeof offsets / sizeof offsets[0]];
-    for (size_t i = 0; i < sizeof fixed / sizeof fixed[0]; ++i) {
+    const size_t fixed_count = sizeof fixed / sizeof fixed[0] - (d->noise == SIZE_MAX);
+    for (size_t i = 0; i < fixed_count; ++i) {
         if (!slot(s, &fixed[i], offsets[i], counts[i], widths[i])) return 0;
         for (size_t j = 0; j < i; ++j)
             if (!disjoint(fixed[i], fixed[j])) return 0;
@@ -85,7 +86,7 @@ static int valid_session(const ck_diffusion_session *s)
         span here[3];
         if (!plane_slots(s, i, here)) return 0;
         for (size_t k = 0; k < 3; ++k) {
-            for (size_t j = 0; j < sizeof fixed / sizeof fixed[0]; ++j)
+            for (size_t j = 0; j < fixed_count; ++j)
                 if (!disjoint(here[k], fixed[j])) return 0;
             for (size_t j = 0; j < k; ++j)
                 if (!disjoint(here[k], here[j])) return 0;
@@ -184,10 +185,13 @@ int ck_generate_diffusion_block(ck_diffusion_session *s, const ck_diffusion_bloc
         !region(&operands[1], r->output_ids, r->output_capacity, sizeof(int32_t)) ||
         !region(&operands[2], r->staged_ids, r->staged_capacity, sizeof(int32_t)) ||
         !region(&operands[3], r->latent, r->latent_elements, sizeof(double)) ||
-        !region(&operands[4], r->schedule, r->schedule_count, sizeof(double)) ||
-        !region(&operands[5], r->noise, r->noise_elements, sizeof(double)))
+        !region(&operands[4], r->schedule, r->schedule_count, sizeof(double)))
         return -1;
-    for (size_t i = 0; i < sizeof operands / sizeof operands[0]; ++i) {
+    const int noisy = s->step_bindings.noise != SIZE_MAX;
+    if (noisy ? !region(&operands[5], r->noise, r->noise_elements, sizeof(double))
+              : r->noise || r->noise_elements)
+        return -1;
+    for (size_t i = 0; i < 5u + (size_t)noisy; ++i) {
         if (!external(s, operands[i])) return -1;
         for (size_t j = 0; j < i; ++j)
             if (!disjoint(operands[i], operands[j])) return -1;
@@ -227,7 +231,8 @@ int ck_generate_seeded_diffusion(ck_diffusion_session *s, ck_diffusion_seeded_re
         !isfinite(r->guidance) || r->staged_capacity < s->block_rows)
         return -1;
     const size_t n = s->latent_elements;
-    const size_t samples = n * r->schedule_count;
+    const int noisy = s->step_bindings.noise != SIZE_MAX;
+    const size_t samples = noisy ? n * r->schedule_count : n;
     if (r->workspace_elements < samples) return -1;
     span operands[6];
     if (!region(&operands[0], r, sizeof(*r), 1) ||
@@ -252,7 +257,7 @@ int ck_generate_seeded_diffusion(ck_diffusion_session *s, ck_diffusion_seeded_re
     if (status) return status;
 
     ck_diffusion_block_request block = {
-        .latent = r->workspace, .schedule = r->schedule, .noise = r->workspace + n,
+        .latent = r->workspace, .schedule = r->schedule, .noise = noisy ? r->workspace + n : NULL,
         .latent_elements = n, .schedule_count = r->schedule_count, .noise_elements = samples - n,
         .guidance = r->guidance, .staged_ids = r->staged_ids, .staged_capacity = r->staged_capacity,
         .output_capacity = s->block_rows, .should_cancel = r->should_cancel, .cancel_context = r->cancel_context,

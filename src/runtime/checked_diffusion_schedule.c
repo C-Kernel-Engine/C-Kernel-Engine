@@ -38,7 +38,8 @@ static int validate_request(const ck_diffusion_schedule_request *r)
         !r->vocabulary || r->vocabulary > INT32_MAX || r->schedule_count < 2 ||
         r->latent_elements > SIZE_MAX / sizeof(double) / (r->schedule_count - 1) ||
         r->schedule_count > SIZE_MAX / sizeof(double) ||
-        r->noise_elements != (r->schedule_count - 1) * r->latent_elements ||
+        (r->bindings.noise == SIZE_MAX ? r->noise || r->noise_elements :
+         r->noise_elements != (r->schedule_count - 1) * r->latent_elements) ||
         r->output_capacity < r->token_count || r->output_capacity > SIZE_MAX / sizeof(int32_t))
         return 0;
     const size_t n = r->latent_elements;
@@ -47,26 +48,27 @@ static int validate_request(const ck_diffusion_schedule_request *r)
         {r->arena, r->arena_bytes, _Alignof(double)},
         {r->initial_latent, n * sizeof(double), _Alignof(double)},
         {r->schedule, r->schedule_count * sizeof(double), _Alignof(double)},
-        {r->noise, r->noise_elements * sizeof(double), _Alignof(double)},
         {r->output_ids, r->output_capacity * sizeof(int32_t), _Alignof(int32_t)},
+        {r->noise, r->noise_elements * sizeof(double), _Alignof(double)},
     };
-    if (!valid_regions(external, sizeof external / sizeof external[0])) return 0;
+    if (!valid_regions(external, sizeof external / sizeof external[0] - (r->bindings.noise == SIZE_MAX))) return 0;
 
     const ck_diffusion_step_bindings *b = &r->bindings;
     const size_t offsets[] = {
-        b->latent, b->next_latent, b->noise, b->gamma, b->self_condition, b->conditional_mean, b->token_ids
+        b->latent, b->next_latent, b->gamma, b->self_condition, b->conditional_mean, b->token_ids, b->noise
     };
     const size_t doubles = n * sizeof(double), floats = n * sizeof(float);
-    const size_t sizes[] = {doubles, doubles, doubles, 2 * sizeof(double), floats, floats,
-                            r->token_count * sizeof(int32_t)};
-    const size_t alignments[] = {_Alignof(double), _Alignof(double), _Alignof(double), _Alignof(double),
-                                 _Alignof(float), _Alignof(float), _Alignof(int32_t)};
+    const size_t sizes[] = {doubles, doubles, 2 * sizeof(double), floats, floats,
+                            r->token_count * sizeof(int32_t), doubles};
+    const size_t alignments[] = {_Alignof(double), _Alignof(double), _Alignof(double), _Alignof(float),
+                                 _Alignof(float), _Alignof(int32_t), _Alignof(double)};
     schedule_region slices[sizeof offsets / sizeof offsets[0]];
-    for (size_t i = 0; i < sizeof slices / sizeof slices[0]; ++i) {
+    const size_t slice_count = sizeof slices / sizeof slices[0] - (b->noise == SIZE_MAX);
+    for (size_t i = 0; i < slice_count; ++i) {
         if (offsets[i] > r->arena_bytes || sizes[i] > r->arena_bytes - offsets[i]) return 0;
         slices[i] = (schedule_region){r->arena + offsets[i], sizes[i], alignments[i]};
     }
-    if (!valid_regions(slices, sizeof slices / sizeof slices[0])) return 0;
+    if (!valid_regions(slices, slice_count)) return 0;
 
     for (size_t i = 0; i < n; ++i)
         if (!isfinite(r->initial_latent[i])) return 0;
@@ -99,10 +101,10 @@ int ck_run_checked_diffusion_schedule(const ck_diffusion_schedule_request *r)
         gamma[0] = r->schedule[i];
         if (i == final) {
             gamma[1] = gamma[0];
-            memset(arena + b->noise, 0, n * sizeof(double));
+            if (b->noise != SIZE_MAX) memset(arena + b->noise, 0, n * sizeof(double));
         } else {
             gamma[1] = r->schedule[i + 1];
-            memcpy(arena + b->noise, r->noise + i * n, n * sizeof(double));
+            if (b->noise != SIZE_MAX) memcpy(arena + b->noise, r->noise + i * n, n * sizeof(double));
         }
         const int status = r->step(arena, r->arena_bytes);
         if (status) return status;
