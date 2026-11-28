@@ -1823,6 +1823,28 @@ python -m pytest -q tests/test_v8_drama3_bf16_codebook_frame.py \
      The run establishes single-prompt synthesis. Published sampler parity,
      full-model checkpoint parity and a packaged speech session remain separate
      acceptance gates.</p>
+  <p>The generated-C harness accepts multiple plain-text requests on one loaded
+     text backbone and tower. Supply the pinned Fish checkpoint including
+     <code>codec.pth</code>, the compiled backbone directory, and the converted
+     weights directory. The harness verifies the source files it opens, uses
+     generated entries for the neural computation and writes one WAV and JSON
+     receipt per completed request.</p>
+  <pre><code>CK_BUMP_FORCE_MIXED=1 python -m version.v8.tts.drama3_native_harness \
+  --checkpoint /path/to/drama3 --bundle /path/to/generated-backbone \
+  --weights /path/to/bump --output /tmp/drama3-acceptance \
+  --text 'Hello, CKE.' --text 'Test complete.' --text 'Hello, CKE.' \
+  --max-frames 2</code></pre>
+  <p>A frame budget of two is a short length-stop test. Use a budget of 96 to
+     exercise natural termination on the pinned phrase. The harness prepares
+     the prompt-prefill and codec arenas for each request geometry. Its
+     synchronous cancellation callback is polled at generated-entry boundaries.
+     Cancellation suppresses WAV publication, and a subsequent request resets
+     decoder and tower state. A long codec call can delay cancellation.</p>
+  <p>On Ryzen, the 26, 24, and 26 token requests produced two frames each.
+     The first and third WAVs were byte-identical. In a separate run, the
+     same session rejected invalid requests, stopped after one generated
+     frame, and recovered to the exact 41-frame EOS WAV from the earlier
+     diagnostic.</p>
 
   <h2 id="xray-diagnosis">11. Diagnose divergence with X-Ray</h2>
   <p>When parity fails, do not poke at tolerances. Walk the decision tree &mdash; each branch names an owner, and the fix lands in that owner's artifact (see <a href="xray.html">the X-Ray page</a> for the full evidence model and capture-neutrality gates):</p>
