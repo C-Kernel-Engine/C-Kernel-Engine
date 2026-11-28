@@ -6984,6 +6984,7 @@ typedef struct {
     const uint16_t *k;
     const uint16_t *v;
     size_t kv_stride;
+    size_t q_head_stride;
     int group_size;
     int first_token;
     int tokens;
@@ -7000,7 +7001,7 @@ static ck_attention_status_t ck_attention_regular_decode_head(
     const int first_token = args->first_token;
     const int kv_tokens = args->tokens;
     const size_t kv_offset = (size_t)(head / args->group_size) * args->kv_stride;
-    const float *q_head = args->q + (size_t)head * (size_t)aligned_head_dim;
+    const float *q_head = args->q + (size_t)head * args->q_head_stride;
     const uint16_t *k_head = args->k + kv_offset;
     const uint16_t *v_head = args->v + kv_offset;
     uint16_t *q_half = (uint16_t *)alloca((size_t)head_dim * sizeof(uint16_t));
@@ -7109,6 +7110,7 @@ ck_attention_status_t attention_forward_decode_head_major_gqa_f16cache_regular_n
     const ck_regular_decode_args_t args = {
         .q = q_token, .k = k_cache, .v = v_cache,
         .kv_stride = (size_t)cache_capacity * (size_t)aligned_head_dim,
+        .q_head_stride = (size_t)aligned_head_dim,
         .group_size = num_heads / num_kv_heads,
         .first_token = first_token, .tokens = kv_tokens,
         .head_dim = head_dim, .stride = aligned_head_dim,
@@ -8156,6 +8158,119 @@ ck_attention_status_t attention_forward_causal_head_major_gqa_prefill_append_f16
     return status;
 }
 
+enum {
+    CK_REGULAR_PREFILL_MAX_ROWS = 32,
+    CK_REGULAR_PREFILL_STAGE_FLOATS = 65536,
+};
+
+typedef struct {
+    ck_regular_decode_args_t head;
+    float *staged;
+    int num_heads;
+    int past_tokens;
+    int first_row;
+    int sliding_window;
+    ck_attention_status_t status[CK_REGULAR_PREFILL_MAX_ROWS];
+} ck_regular_prefill_work_t;
+
+static void ck_attention_regular_prefill_rows(int begin, int end, void *opaque)
+{
+    ck_regular_prefill_work_t *work = opaque;
+    for (int row = begin; row < end; ++row) {
+        ck_regular_decode_args_t args = work->head;
+        const int query_row = work->first_row + row;
+        args.q += (size_t)query_row * (size_t)args.stride;
+        args.tokens = work->past_tokens + query_row + 1;
+        args.first_token = args.tokens > work->sliding_window
+            ? args.tokens - work->sliding_window : 0;
+        work->status[row] = CK_ATTENTION_STATUS_OK;
+        for (int head = 0; head < work->num_heads; ++head) {
+            float *dst = work->staged + ((size_t)row * (size_t)work->num_heads + (size_t)head) *
+                (size_t)args.stride;
+            const ck_attention_status_t status = ck_attention_regular_decode_head(&args, head, dst);
+            if (status != CK_ATTENTION_STATUS_OK) {
+                work->status[row] = status;
+                break;
+            }
+        }
+    }
+}
+
+/* The caller publishes only complete rows, in the same order as the
+ * token-at-a-time route. The model's scratch and persistent KV are unchanged. */
+static int ck_attention_try_regular_sliding_prefill(
+    const float *q, const uint16_t *k, const uint16_t *v, float *out,
+    int num_heads, int num_kv_heads, int q_tokens, int past_tokens,
+    int cache_capacity, int head_dim, int stride, int sliding_window,
+    int first_row, int rows, size_t row_elems, const float *token_workspace,
+    ck_attention_status_t *status)
+{
+    const char *policy = getenv("CK_EXPERIMENT_REGULAR_FP16_PREFILL_ROWS");
+    if (!policy || strcmp(policy, "1") != 0 || sliding_window <= 0 ||
+        rows < 8 || head_dim > 4096 || num_heads % num_kv_heads != 0 ||
+        row_elems > CK_REGULAR_PREFILL_STAGE_FLOATS / 8 ||
+        row_elems > SIZE_MAX / sizeof(float) / (size_t)q_tokens ||
+        (size_t)cache_capacity > SIZE_MAX / sizeof(uint16_t) / (size_t)stride /
+            (size_t)num_kv_heads || ck_attention_threadpool_disabled()) {
+        return 0;
+    }
+    const size_t tensor_bytes = row_elems * (size_t)q_tokens * sizeof(float);
+    const size_t kv_stride = (size_t)cache_capacity * (size_t)stride;
+    const size_t kv_bytes = kv_stride * (size_t)num_kv_heads * sizeof(uint16_t);
+    const size_t token_bytes = 2 * row_elems * sizeof(float);
+    if (ck_attention_regular_decode_overlap(q, tensor_bytes, out, tensor_bytes) ||
+        ck_attention_regular_decode_overlap(k, kv_bytes, out, tensor_bytes) ||
+        ck_attention_regular_decode_overlap(v, kv_bytes, out, tensor_bytes) ||
+        ck_attention_regular_decode_overlap(token_workspace, token_bytes, q, tensor_bytes) ||
+        ck_attention_regular_decode_overlap(token_workspace, token_bytes, out, tensor_bytes) ||
+        ck_attention_regular_decode_overlap(token_workspace, token_bytes, k, kv_bytes) ||
+        ck_attention_regular_decode_overlap(token_workspace, token_bytes, v, kv_bytes)) {
+        return 0;
+    }
+    ck_threadpool_t *pool = ck_threadpool_global();
+    const int active = ck_attention_thread_cap(pool);
+    if (active <= 1 || ck_threadpool_in_dispatch(pool)) return 0;
+
+    int row_limit = (int)(CK_REGULAR_PREFILL_STAGE_FLOATS / row_elems);
+    if (row_limit > CK_REGULAR_PREFILL_MAX_ROWS) row_limit = CK_REGULAR_PREFILL_MAX_ROWS;
+    if (row_limit > rows) row_limit = rows;
+    float *staged = (float *)alloca((size_t)row_limit * row_elems * sizeof(float));
+    const char *score_policy = getenv("CK_EXPERIMENT_REGULAR_FP16_CACHE_SCORES");
+    ck_regular_prefill_work_t work = {
+        .head = {
+            .q = q, .k = k, .v = v, .kv_stride = kv_stride,
+            .q_head_stride = (size_t)q_tokens * (size_t)stride,
+            .group_size = num_heads / num_kv_heads, .head_dim = head_dim, .stride = stride,
+            .reuse_scores = score_policy && strcmp(score_policy, "1") == 0,
+        },
+        .staged = staged, .num_heads = num_heads, .past_tokens = past_tokens,
+        .sliding_window = sliding_window,
+    };
+    for (int offset = 0; offset < rows; ) {
+        const int batch = rows - offset < row_limit ? rows - offset : row_limit;
+        const int workers = active < batch ? active : batch;
+        work.first_row = first_row + offset;
+        ck_threadpool_parallel_for_n(pool, workers, 0, batch, 1,
+                                     ck_attention_regular_prefill_rows, &work);
+        for (int row = 0; row < batch; ++row) {
+            if (work.status[row] != CK_ATTENTION_STATUS_OK) {
+                *status = work.status[row];
+                return 1;
+            }
+            for (int head = 0; head < num_heads; ++head) {
+                float *dst = out + ((size_t)head * (size_t)q_tokens + (size_t)(work.first_row + row)) *
+                    (size_t)stride;
+                const float *src = staged + ((size_t)row * (size_t)num_heads + (size_t)head) *
+                    (size_t)stride;
+                memcpy(dst, src, (size_t)stride * sizeof(float));
+            }
+        }
+        offset += batch;
+    }
+    *status = CK_ATTENTION_STATUS_OK;
+    return 1;
+}
+
 static ck_attention_status_t ck_attention_prefill_append_f16cache_gemma4_workspace(
     const float *q,
     const uint16_t *k_cache,
@@ -8242,6 +8357,16 @@ static ck_attention_status_t ck_attention_prefill_append_f16cache_gemma4_workspa
             (reduction == CK_ATTN_REDUCTION_F16_FLASH_AUTO_QTILE64_REGULAR_TAIL_NOSCALE ||
              reduction == CK_ATTN_REDUCTION_F16_Q_PROB_ROUND_QTILE64_REGULAR_TAIL_NOSCALE)
                 ? CK_ATTN_REDUCTION_F16_REGULAR_NOSCALE : reduction;
+        ck_attention_status_t rows_status;
+        if (selected == CK_ATTN_REDUCTION_F16_REGULAR_NOSCALE &&
+            ck_attention_try_regular_sliding_prefill(
+                q, k_cache, v_cache, output, num_heads, num_kv_heads, q_tokens,
+                past_tokens, cache_capacity, head_dim, aligned_head_dim, sliding_window,
+                row_offset, rows, token_elems, token_workspace, &rows_status)) {
+            if (rows_status != CK_ATTENTION_STATUS_OK) return rows_status;
+            row_offset += rows;
+            continue;
+        }
         for (int local_row = 0; local_row < rows; ++local_row) {
             const int t = row_offset + local_row;
             for (int h = 0; h < num_heads; ++h) {

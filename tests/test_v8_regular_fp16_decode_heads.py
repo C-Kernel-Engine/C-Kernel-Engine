@@ -135,6 +135,59 @@ class RegularFP16DecodeHeadsTests(unittest.TestCase):
                 with patch.dict(os.environ, {flag: "1"}):
                     self.assertEqual(self.invoke(long_cache, tokens, 0), expected)
 
+    def test_regular_sliding_prefill_rows(self):
+        prefill = self.lib.attention_forward_causal_head_major_gqa_prefill_segmented_f16cache_sliding_gemma4_workspace
+        prefill.argtypes = [C.c_void_p] * 4 + [C.c_int] * 9 + [
+            C.c_void_p, C.c_size_t, C.POINTER(C.c_int), C.c_int,
+        ]
+        prefill.restype = C.c_int
+        heads, groups, tokens, stride, dim, capacity = 6, 2, 65, 272, 257, 192
+        rng = np.random.default_rng(1116)
+        query = rng.normal(0, .1, (heads, tokens, stride)).astype("f4")
+        _, keys, values, _ = self.inputs(heads, groups, dim, stride, capacity)
+        workspace = np.empty(2 * heads * stride, dtype="f4")
+        segments = (C.c_int * 3)(33, 0, 32)
+
+        def invoke(mode, worker_cap=8, alias=False):
+            q = query.copy()
+            out = q if alias else np.full_like(query, 99)
+            with patch.dict(os.environ, {
+                "CK_EXPERIMENT_REGULAR_FP16_PREFILL_ROWS": str(mode),
+                "CK_EXPERIMENT_REGULAR_FP16_CACHE_SCORES": "0",
+                "CK_DISABLE_ATTENTION_THREADPOOL": "0",
+                "CK_ATTENTION_THREAD_CAP": str(worker_cap),
+            }):
+                self.lib.ck_threadpool_profile_reset(self.pool)
+                status = prefill(q.ctypes.data, keys.ctypes.data, values.ctypes.data, out.ctypes.data,
+                                 heads, groups, tokens, 96, capacity, dim, stride, 128, 5,
+                                 workspace.ctypes.data, workspace.nbytes, segments, len(segments))
+                profile = PoolProfile()
+                self.lib.ck_threadpool_profile_snapshot(self.pool, C.byref(profile))
+            return status, out.tobytes(), profile.dispatch_count
+
+        baseline = invoke(0)
+        grouped = invoke(1)
+        self.assertEqual(grouped[:2], baseline[:2])
+        if self.workers > 1:
+            self.assertEqual(grouped[2], 2)
+            self.assertGreater(baseline[2], grouped[2])
+
+        for row in (0, 32, 33, 64):
+            with self.subTest(invalid_row=row):
+                saved = query[3, row, :].copy()
+                query[3, row, :] = np.nan
+                expected = invoke(0)
+                actual = invoke(1)
+                self.assertNotEqual(expected[0], 0)
+                self.assertEqual(actual[:2], expected[:2])
+                out = np.frombuffer(actual[1], dtype="f4").reshape(query.shape)
+                self.assertTrue(np.all(out[:, row:, :] == 99))
+                query[3, row, :] = saved
+
+        self.assertEqual(invoke(1)[:2], baseline[:2])
+        self.assertEqual(invoke(1, worker_cap=1), invoke(0, worker_cap=1))
+        self.assertEqual(invoke(1, alias=True), invoke(0, alias=True))
+
     def test_alias_staging_limit_and_concurrent_callers(self):
         inputs = self.inputs()
         q = inputs[0]
