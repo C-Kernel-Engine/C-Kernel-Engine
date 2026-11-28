@@ -6996,6 +6996,7 @@ test-kernel-maps:
 		tests/test_v8_sigma_bf16_block.py \
 		tests/test_v8_sigma_bf16_denoiser_stack.py \
 		tests/test_v8_sigma_native_step.py \
+		tests/test_v8_sigma_native_session.py \
 		tests/test_v8_drama3_bf16_tower.py \
 		tests/test_v8_drama3_bf16_codebook_frame.py \
 		tests/test_v8_groundhog_moe.py \
