@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from version.v8.scripts.compile_checked_bundle_v8 import compile_checked_weight_graph
-from version.v8.tts.build_drama3_bf16_codebook_frame import build_circuit
+from version.v8.tts.build_drama3_bf16_codebook_frame import build_circuit, build_prefill_circuit
 
 
 def bits(x):
@@ -17,7 +17,7 @@ def bits(x):
     return x.contiguous().view(torch.uint16).numpy()
 
 
-def oracle_layer(hidden, code, table, weights, key, embed_extra, heads, kv_heads, dim, trace=None, operands=None):
+def oracle_layer(hidden, code, table, weights, key, embed_extra, heads, kv_heads, dim, trace=None, operands=None, history=None):
     import torch
     from torch.nn import functional as F
 
@@ -48,6 +48,29 @@ def oracle_layer(hidden, code, table, weights, key, embed_extra, heads, kv_heads
     # The first-layer regression separately exercises Q/K and multiple keys.
     value = checkpoint("v", projection(normalized, attn + "v.weight"))
     context = value.reshape(kv_heads, dim).repeat_interleave(heads // kv_heads, dim=0).reshape(1, -1)
+    if history is not None:
+        prefix_key, prefix_value, position = history
+        frequencies = weights["inv_freq"]
+        angles = position * frequencies
+        rotary = 2 * len(frequencies)
+
+        def rotate(port, count):
+            raw = projection(normalized, attn + port + ".weight").reshape(count, dim)
+            x = norm(raw, attn + port + "_norm.weight")
+            even, odd = x[..., :rotary:2].float(), x[..., 1:rotary:2].float()
+            a = torch.stack((even * angles.cos() - odd * angles.sin(),
+                             odd * angles.cos() + even * angles.sin()), dim=-1)
+            return torch.cat((a.flatten(-2).bfloat16(), x[..., rotary:]), dim=-1)
+
+        query, current_key = rotate("q", heads), rotate("k", kv_heads)
+        value = value.reshape(kv_heads, dim)
+        keys = torch.cat((prefix_key, current_key[None]), dim=0).transpose(0, 1)
+        values = torch.cat((prefix_value, value[None]), dim=0).transpose(0, 1)
+        ratio = heads // kv_heads
+        context = F.scaled_dot_product_attention(
+            query[:, None, :], keys.repeat_interleave(ratio, dim=0),
+            values.repeat_interleave(ratio, dim=0),
+        ).reshape(1, -1)
     context = checkpoint("context", context)
     attn_gate = checkpoint("attention_gate", projection(normalized, attn + "attention_gate.weight"))
     context = checkpoint("gated_context", context * attn_gate.sigmoid())
@@ -95,7 +118,7 @@ def projection_receipt(native, oracle, source, weight, packet, key):
 
 
 
-def run_frame(folder, torch, weights, tables, settings):
+def run_frame(folder, torch, weights, tables, settings, *, check_continuation=False):
     from torch.nn import functional as F
 
     graph, config, schema = build_circuit(**settings)
@@ -214,6 +237,8 @@ def run_frame(folder, torch, weights, tables, settings):
     code_buffer[0] = 2
     assert run(arena, len(arena)) == 0
     np.testing.assert_array_equal(view("frame_codes", np.int32), saved)
+    if check_continuation:
+        check_next_frame(folder, torch, weights, tables, settings, stored, view, hidden, extra, saved)
     if replay_operands:
         np.savez(folder / "same-history-projection-operands.npz", **replay_operands)
     return {
@@ -221,6 +246,109 @@ def run_frame(folder, torch, weights, tables, settings):
         "first_layer": first_layer[:2], "scores": metrics, "same_history": same_history,
         "max_abs": max(v["max_abs"] for v in metrics), "worst_rmse": max(v["rmse"] for v in metrics),
     }
+
+
+def tower_labels(settings):
+    return [f"{kind}{index}" for kind in ("shared", "residual") for index in range(settings[f"{kind}_layers"])]
+
+
+def check_next_frame(folder, torch, weights, tables, settings, stored, previous, hidden, extra, frame):
+    from torch.nn import functional as F
+
+    prefill_dir = folder / "teacher_forced_prefix"
+    prefill_dir.mkdir()
+    geometry = {name: value for name, value in settings.items() if name != "residual_vocab"}
+    graph, config, schema = build_prefill_circuit(1, **geometry)
+    prefill, prefill_arena, prepared, _ = compile_checked_weight_graph(
+        prefill_dir, graph, {name: stored[name] for name in schema}, schema, source_config=config,
+    )
+    for name in ("hidden", "unseen_sum"):
+        prepared(name, np.uint16)[:] = previous(name, np.uint16)
+    for name in ("positions", "ranges", "code_rows"):
+        prepared(name, np.int32)[:] = previous(name, np.int32)
+    for label, table in tables.items():
+        prepared(f"{label}_embedding_table", np.uint16)[:-1] = bits(table)
+        prepared(f"{label}_embedding_table", np.uint16)[-1] = 0
+    for index in range(1, settings["residual_layers"]):
+        prepared(f"residual{index}_code_rows", np.int32)[:] = [frame[index]]
+    assert prefill(prefill_arena, len(prefill_arena)) == 0
+    for label in tables:
+        for output in ("k_rotary", "v", "output"):
+            name = f"{label}_{output}"
+            np.testing.assert_array_equal(prepared(name, np.uint16), previous(name, np.uint16))
+
+    continuation = folder / "next_frame"
+    continuation.mkdir()
+    graph, config, schema = build_circuit(prefix_rows=2, **settings)
+    run, arena, view, _ = compile_checked_weight_graph(continuation, graph, stored, schema, source_config=config)
+    heads, kv_heads, dim = (settings[name] for name in ("heads", "kv_heads", "dim"))
+    next_hidden = hidden.flip(-1).contiguous()
+    next_extra = extra.neg()
+    semantic = 3  # a separately supplied semantic input for this synthetic frame
+    view("hidden", np.uint16)[:] = bits(next_hidden)
+    view("unseen_sum", np.uint16)[:] = bits(next_extra)
+    view("positions", np.int32)[:] = [1]
+    view("ranges", np.int32)[:] = [[0, 1, 2, 3]]
+    view("code_rows", np.int32)[:] = [semantic]
+    prefixes = {}
+    for label, table in tables.items():
+        view(f"{label}_embedding_table", np.uint16)[:] = bits(table)
+        pair = []
+        for kind, name in (("key", "k_rotary"), ("value", "v")):
+            plane = view(f"{label}_prefix_{kind}", np.uint16)
+            plane[0] = prepared(f"{label}_{name}", np.uint16)[0]
+            plane[1] = 0x4400
+            pair.append((plane, plane.copy()))
+        prefixes[label] = pair
+
+    assert run(arena, len(arena)) == 0
+    h, code = next_hidden, semantic
+    expected = [semantic]
+    limit = settings["residual_vocab"]
+    for i, label in enumerate(tower_labels(settings)):
+        table = tables[label]
+        shared = label.startswith("shared")
+        index = int(label.removeprefix("shared" if shared else "residual"))
+        key = f"audio_decoder_mtp{'_shared' if shared else ''}.layers.{index}."
+        k, v = (torch.from_numpy(saved[:1].copy()).view(torch.bfloat16).reshape(1, kv_heads, dim)
+                for _, saved in prefixes[label])
+        h = oracle_layer(h, code, table, weights, key, next_extra if i == 0 else None,
+                         heads, kv_heads, dim, history=(k, v, 1))
+        if not shared:
+            oracle = F.linear(h, weights[f"audio_decoder_mtp.heads.{index}.weight"][:limit])
+            native = torch.from_numpy(view(f"{label}_scores", np.uint16).copy()).view(torch.bfloat16)
+            torch.testing.assert_close(native.float(), oracle.float(), atol=.016, rtol=0)
+            code = int(oracle.argmax(-1).item())
+            expected.append(code)
+
+    result = view("frame_codes", np.int32).copy()
+    np.testing.assert_array_equal(result, expected)
+    view("ranges", np.int32)[0, -1] = 4
+    assert run(arena, len(arena)) != 0
+    np.testing.assert_array_equal(view("frame_codes", np.int32), result)
+    view("ranges", np.int32)[0, -1] = 3
+    assert run(arena, len(arena)) == 0
+    np.testing.assert_array_equal(view("frame_codes", np.int32), result)
+    for pair in prefixes.values():
+        for plane, saved in pair:
+            np.testing.assert_array_equal(plane, saved)
+
+    forced_dir = folder / "forced_next_frame"
+    forced_dir.mkdir()
+    graph, cfg, schema = build_circuit(prefix_rows=2, forced_feedback=True, **settings)
+    force, force_arena, bound, _ = compile_checked_weight_graph(forced_dir, graph, stored, schema, source_config=cfg)
+    layer_inputs = ("embedding_table", "prefix_key", "prefix_value")
+    for name in ("hidden", "unseen_sum", *(f"{label}_{name}" for label in tables for name in layer_inputs)):
+        bound(name, np.uint16)[:] = view(name, np.uint16)
+    for name in ("positions", "ranges", "code_rows"):
+        bound(name, np.int32)[:] = view(name, np.int32)
+    for index, code in enumerate(result[1:-1]):
+        bound(f"residual{index}_forced_code", np.int32)[:] = [code]
+    assert force(force_arena, len(force_arena)) == 0
+    np.testing.assert_array_equal(bound("frame_codes", np.int32), result)
+    bound("residual0_forced_code", np.int32)[:] = [settings["vocabulary"]]
+    assert force(force_arena, len(force_arena)) != 0
+    np.testing.assert_array_equal(bound("frame_codes", np.int32), result)
 
 
 def test_generated_codebook_feedback(tmp_path):
@@ -234,7 +362,7 @@ def test_generated_codebook_feedback(tmp_path):
     weights["inv_freq"] = torch.tensor([1.0, 0.01])
     tables = {f"{kind}{index}": torch.randn((7, 11), generator=rng).bfloat16()
               for kind, count in (("shared", 2), ("residual", 3)) for index in range(count)}
-    report = run_frame(tmp_path, torch, weights, tables, settings)
+    report = run_frame(tmp_path, torch, weights, tables, settings, check_continuation=True)
     assert report["codes"] == report["reference_codes"], report
     assert report["max_abs"] <= 0.015625, report
     for codes, aligned in zip(report["codes"], report["same_history"], strict=True):
@@ -245,12 +373,7 @@ def test_generated_codebook_feedback(tmp_path):
         assert last["stages"]["embedding"]["identical_operands"]["different"] == 0
 
 
-def test_pinned_codebook_frame(tmp_path, record_property):
-    root = os.environ.get("CK_DRAMA3_TOWER_RANGES")
-    if not root or not os.environ.get("CK_BLAS_LIBRARY"):
-        pytest.skip("configure CK_DRAMA3_TOWER_RANGES and CK_BLAS_LIBRARY for the pinned tower")
-    torch = pytest.importorskip("torch")
-    torch.set_num_threads(4)
+def pinned_tower_weights(root, torch):
     settings = dict(shared_layers=4, residual_layers=9, residual_vocab=1024, vocabulary=4096,
                     width=2048, heads=16, kv_heads=2, dim=256, rotary=64, inner=6144, blas=True)
     artifacts = {
@@ -284,7 +407,146 @@ def test_pinned_codebook_frame(tmp_path, record_property):
             else:
                 weights[key] = t
     weights["inv_freq"] = 10000000.0 ** (-torch.arange(0, 64, 2, dtype=torch.float32) / 64)
+    return weights, tables, settings
+
+
+def test_pinned_codebook_frame(tmp_path, record_property):
+    root = os.environ.get("CK_DRAMA3_TOWER_RANGES")
+    if not root or not os.environ.get("CK_BLAS_LIBRARY"):
+        pytest.skip("configure CK_DRAMA3_TOWER_RANGES and CK_BLAS_LIBRARY for the pinned tower")
+    torch = pytest.importorskip("torch")
+    torch.set_num_threads(4)
+    weights, tables, settings = pinned_tower_weights(root, torch)
     report = run_frame(tmp_path, torch, weights, tables, settings)
     record_property("reports", json.dumps(report))
     assert report["codes"] == report["reference_codes"]
     assert report["max_abs"] <= 0.5 and report["worst_rmse"] <= 0.05
+
+
+def test_publisher_text_conditioned_tower(tmp_path, record_property):
+    """Check the tower with publisher text history and then native K/V feedback."""
+    from version.v8.tts.capture_drama3_two_frame_reference import (
+        CHECKPOINT_REVISION, PUBLISHER_REVISION, digest,
+    )
+
+    root = os.environ.get("CK_DRAMA3_TOWER_RANGES")
+    capture = os.environ.get("CK_DRAMA3_TWO_FRAME_REFERENCE")
+    if not root or not capture or not os.environ.get("CK_BLAS_LIBRARY"):
+        pytest.skip("configure tower ranges, LP64 BLAS and a captured publisher text request")
+    torch = pytest.importorskip("torch")
+    torch.set_num_threads(4)
+    capture = Path(capture)
+    receipt = json.loads((capture / "report.json").read_text())
+    assert receipt["schema"] == "cke.drama3.reference.two_frames.v1"
+    assert receipt["checkpoint_revision"] == CHECKPOINT_REVISION
+    assert receipt["publisher_revision"] == PUBLISHER_REVISION
+    assert receipt["frames_sha256"] == digest(capture / "frames.npz")
+    with np.load(capture / "frames.npz", allow_pickle=False) as ref:
+        rows = ref["frame_rows"]
+        assert rows.shape == (2, 11) and np.issubdtype(rows.dtype, np.integer)
+        assert rows.tolist() == receipt["frames"]
+        assert np.array_equal(rows[:, 0] - 248099, rows[:, 1])
+        assert ((rows[:, 1:] >= 0) & (rows[:, 1:] < 4096)).all()
+        prompt_rows = len(ref["prompt_rows"])
+        assert prompt_rows == receipt["prompt_rows"] and prompt_rows > 1
+        assert np.array_equal(ref["step0_input_row"], ref["prompt_rows"][-1:])
+        assert np.array_equal(ref["step1_input_row"], rows[:1])
+        weights, tables, settings = pinned_tower_weights(root, torch)
+        settings["residual_vocab"] = settings["vocabulary"]  # publisher scores every raw tower ID
+        graph, cfg, schema = build_circuit(prefix_rows=prompt_rows, forced_feedback=True, **settings)
+        stored = {name: weights[name].numpy() if name == "inv_freq" else bits(weights[name])
+                  for name in schema}
+        run, arena, view, _ = compile_checked_weight_graph(
+            tmp_path, graph, stored, schema, source_config=cfg, target_isa="avx2",
+        )
+        for label, table in tables.items():
+            view(f"{label}_embedding_table", np.uint16)[:] = bits(table)
+
+        def set_bf16(name, values):
+            slot = view(name, np.uint16)
+            assert values.dtype == slot.dtype and values.shape == slot.shape
+            slot[:] = values
+
+        # The capture uses a text-only prompt, so each following prompt row
+        # is a nonsemantic teacher label. The sentinel selects the zero row.
+        prefill_rows = prompt_rows - 1
+        assert not np.any((ref["prompt_rows"][:, 0] >= 248099) & (ref["prompt_rows"][:, 0] <= 252194))
+        np.testing.assert_array_equal(ref["prefill_next_rows"], ref["prompt_rows"][1:])
+        np.testing.assert_array_equal(ref["prefill_positions"], np.arange(prefill_rows))
+        prefill_dir = tmp_path / "prefill"
+        prefill_dir.mkdir()
+        prefill_args = {name: value for name, value in settings.items() if name != "residual_vocab"}
+        graph, cfg, schema = build_prefill_circuit(prefill_rows, **prefill_args)
+        prefill, prefill_arena, prepared, _ = compile_checked_weight_graph(
+            prefill_dir, graph, {name: stored[name] for name in schema}, schema,
+            source_config=cfg, target_isa="avx2",
+        )
+        prepared("hidden", np.uint16)[:] = ref["prefill_hidden"]
+        prepared("unseen_sum", np.uint16).fill(0)
+        prepared("positions", np.int32)[:] = ref["prefill_positions"]
+        prepared("ranges", np.int32)[:] = [[0, p + 1, p + 1, p + 1] for p in range(prefill_rows)]
+        prepared("code_rows", np.int32).fill(settings["vocabulary"])
+        for index in range(1, settings["residual_layers"]):
+            prepared(f"residual{index}_code_rows", np.int32).fill(settings["vocabulary"])
+        for label, table in tables.items():
+            prepared(f"{label}_embedding_table", np.uint16)[:-1] = bits(table)
+            prepared(f"{label}_embedding_table", np.uint16)[-1].fill(0)
+        assert prefill(prefill_arena, len(prefill_arena)) == 0
+        prefill_drift = {}
+        for i, label in enumerate(tower_labels(settings)):
+            for kind, current in (("key", "k_rotary"), ("value", "v")):
+                actual = prepared(f"{label}_{current}", np.uint16)
+                expected = ref[f"tower_{i}_{kind}"][:prefill_rows].reshape(actual.shape)
+                prefill_drift[f"{label}_{kind}"] = difference(
+                    torch.from_numpy(actual).view(torch.bfloat16), torch.from_numpy(expected).view(torch.bfloat16),
+                )
+
+        def replay(step, native_feedback=None, *, native_prefill=False):
+            expected = rows[step, 1:]
+            prefix = f"step{step}_"
+            position = int(ref[prefix + "position"][0])
+            assert position == prompt_rows - 1 + step
+            set_bf16("hidden", ref[prefix + "backbone_hidden"])
+            set_bf16("unseen_sum", ref[prefix + "enrichment"])
+            view("code_rows", np.int32)[:] = [expected[0]]
+            view("positions", np.int32)[:] = [position]
+            view("ranges", np.int32)[:] = [[0, position, prompt_rows, prompt_rows + 1]]
+            for index in range(settings["residual_layers"] - 1):
+                view(f"residual{index}_forced_code", np.int32)[:] = [expected[index + 1]]
+            planes = {}
+            for i, label in enumerate(tower_labels(settings)):
+                for kind, current in (("key", "k_rotary"), ("value", "v")):
+                    data = ref[f"tower_{i}_{kind}"]
+                    assert data.dtype == np.uint16 and data.shape == (prompt_rows + 1, 2, 256)
+                    plane = view(f"{label}_prefix_{kind}", np.uint16)
+                    plane.fill(0)
+                    plane[:position] = data[:position].reshape(position, -1)
+                    if native_prefill:
+                        plane[:prefill_rows] = prepared(f"{label}_{current}", np.uint16)
+                    if native_feedback is not None:
+                        plane[position - 1] = native_feedback[label, current][0]
+                    planes[label, current] = (plane, plane.copy())
+            assert run(arena, len(arena)) == 0
+            scores = []
+            for index in range(settings["residual_layers"]):
+                native = torch.from_numpy(view(f"residual{index}_scores", np.uint16).copy()).view(torch.bfloat16)
+                oracle = torch.from_numpy(ref[prefix + f"head{index}_scores"].copy()).view(torch.bfloat16)
+                scores.append({**difference(native, oracle), **score_comparison(native, oracle)})
+            for plane, before in planes.values():
+                np.testing.assert_array_equal(plane, before)
+            result = {"frame": step, "native_prefix_tail": native_feedback is not None, "native_prefill": native_prefill,
+                      "expected_ids": expected.tolist(), "native_ids": view("frame_codes", np.int32).tolist(),
+                      "scores": scores}
+            return result, {(label, current): view(f"{label}_{current}", np.uint16).copy()
+                            for label, current in planes}
+
+        first, native_tail = replay(0)
+        second, _ = replay(1)
+        repeated_with_tail, _ = replay(1, native_tail)
+        native_first, native_tail = replay(0, native_prefill=True)
+        native_second, _ = replay(1, native_tail, native_prefill=True)
+        results = [first, second, repeated_with_tail, native_first, native_second]
+    record_property("text_conditioned_tower", json.dumps({"frames": results, "prefill_kv": prefill_drift}))
+    for result in results:
+        assert result["native_ids"] == result["expected_ids"]
+        assert all(score["max_abs"] <= .5 and score["rmse"] <= .05 for score in result["scores"])

@@ -1742,6 +1742,39 @@ python -m version.v8.scripts.run_sigma_text_v8 \
   <pre><code>python -m pytest -q tests/test_v8_drama3_bf16_codebook_frame.py \
   -o junit_family=legacy --junitxml=/tmp/drama-codebook-parity.xml</code></pre>
 
+  <h4 id="drama3-two-frame-continuation">Text-conditioned tower continuation</h4>
+  <p>Pin the Fish Speech checkout to
+     <code>1ff3c3ed2f80d3106a83909dd25b83129c3d816f</code> and download the
+     Drama 3 checkpoint at <code>78e5ab79e49aa9a25abe8799eff2c4d73a1c3216</code>.
+     The capture command uses the publisher's prompt construction and
+     generation loop. It verifies the checkpoint, tokenizer, and source
+     revisions, then records the two raw frame rows, prompt hidden states,
+     decode hidden rows, per-codebook scores, and each tower layer's BF16 K/V.
+     The CPU diagnostic stores FP8 experts and uses the publisher's eager BF16
+     fallback for the selected experts. It requires sufficient RAM for the
+     roughly 40 GB checkpoint. The publisher also supports a CUDA run.</p>
+  <pre><code>python -m version.v8.tts.capture_drama3_two_frame_reference \
+  --fish-speech /path/to/fish-speech --checkpoint /path/to/drama3 \
+  --output /tmp/drama3-two-frames --text 'Hello, CKE.'
+export CK_DRAMA3_TWO_FRAME_REFERENCE=/tmp/drama3-two-frames
+python -m pytest -q tests/test_v8_drama3_bf16_codebook_frame.py \
+  -k publisher_text_conditioned_tower -o junit_family=legacy \
+  --junitxml=/tmp/drama3-two-frame-parity.xml</code></pre>
+  <p>Install <code>loguru</code>, <code>tokenizers</code>, and the repository
+     requirements in the oracle environment. Set <code>CK_BLAS_LIBRARY</code>
+     and <code>CK_DRAMA3_TOWER_RANGES</code> as above for the generated replay.
+     The two-frame budget is a diagnostic length stop.</p>
+  <p>In prefill, tower row <var>p</var> uses the hidden state for row
+     <var>p</var> and the teacher label for row <var>p+1</var>. A text label
+     selects an explicit zero embedding. The continuation entry consumes
+     a read-only per-layer prefix and returns the current K/V rows in separate
+     buffers. The replay checks both frames with publisher K/V, then with
+     generated prefill and generated K/V carried from frame one. The
+     publisher's backbone hidden rows and raw code IDs remain oracle inputs
+     to the teacher-forced replay. The scores cover all 4,096 residual IDs.
+     The publisher clamps to the codec's smaller residual range only at
+     the waveform boundary.</p>
+
   <h2 id="xray-diagnosis">11. Diagnose divergence with X-Ray</h2>
   <p>When parity fails, do not poke at tolerances. Walk the decision tree &mdash; each branch names an owner, and the fix lands in that owner's artifact (see <a href="xray.html">the X-Ray page</a> for the full evidence model and capture-neutrality gates):</p>
   <div class="mb-table"><table><thead><tr><th>Observation</th><th>Diagnosis</th><th>Repair</th></tr></thead><tbody>
